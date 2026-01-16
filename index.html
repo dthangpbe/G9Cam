@@ -52,6 +52,9 @@
             <div class="header-content">
                 <h1 class="app-title">📸 G9Cam</h1>
                 <div class="header-actions">
+                    <button id="albumsBtn" class="icon-btn" title="Albums">
+                        📁
+                    </button>
                     <button id="friendsBtn" class="icon-btn">
                         <span class="friend-count">0</span>
                         👥
@@ -251,6 +254,56 @@
             <div id="notificationsList" class="notifications-list">
                 <!-- Notifications rendered here -->
             </div>
+        </div>
+    </div>
+
+    <!-- Albums Modal -->
+    <div id="albumsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>📁 Albums của tôi</h2>
+                <button class="close-modal"
+                    onclick="closeModal(document.getElementById('albumsModal'))">&times;</button>
+            </div>
+            <button id="createAlbumBtn" class="primary-btn" style="margin: 1rem;">+ Tạo Album Mới</button>
+            <div id="albumsList" class="albums-grid"></div>
+        </div>
+    </div>
+
+    <!-- Create Album Modal -->
+    <div id="createAlbumModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Tạo Album Mới</h2>
+                <button class="close-modal"
+                    onclick="closeModal(document.getElementById('createAlbumModal'))">&times;</button>
+            </div>
+            <div style="padding: 1.5rem;">
+                <input type="text" id="albumName" placeholder="Tên album..." maxlength="50"
+                    style="width: 100%; margin-bottom: 1rem;">
+                <textarea id="albumDescription" placeholder="Mô tả (tùy chọn)..." maxlength="200"
+                    style="width: 100%; min-height: 80px; margin-bottom: 1rem;"></textarea>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button id="saveAlbumBtn" class="primary-btn">Tạo Album</button>
+                    <button onclick="closeModal(document.getElementById('createAlbumModal'))"
+                        class="secondary-btn">Hủy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Album Detail Modal -->
+    <div id="albumDetailModal" class="modal">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-header">
+                <div>
+                    <h2 id="albumDetailTitle">Album</h2>
+                    <p id="albumDetailDesc" style="color: var(--text-secondary); margin: 0.5rem 0 0 0;"></p>
+                </div>
+                <button class="close-modal"
+                    onclick="closeModal(document.getElementById('albumDetailModal'))">&times;</button>
+            </div>
+            <div id="albumPhotosGrid" class="albums-photos-grid"></div>
         </div>
     </div>
 
