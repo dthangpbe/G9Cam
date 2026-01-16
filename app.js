@@ -47,7 +47,32 @@ const elements = {
     friendsList: document.getElementById('friendsList'),
     suggestedList: document.getElementById('suggestedList'),
     reactionsModal: document.getElementById('reactionsModal'),
-    friendCount: document.querySelector('.friend-count')
+    friendCount: document.querySelector('.friend-count'),
+    // Profile elements
+    profileBtn: document.getElementById('profileBtn'),
+    profileModal: document.getElementById('profileModal'),
+    closeProfileModal: document.getElementById('closeProfileModal'),
+    profileView: document.getElementById('profileView'),
+    profileEdit: document.getElementById('profileEdit'),
+    profileAvatarDisplay: document.getElementById('profileAvatarDisplay'),
+    profileAvatarImg: document.getElementById('profileAvatarImg'),
+    profileAvatarEmoji: document.getElementById('profileAvatarEmoji'),
+    profileDisplayName: document.getElementById('profileDisplayName'),
+    profileAccountId: document.getElementById('profileAccountId'),
+    profileFriendCount: document.getElementById('profileFriendCount'),
+    profileBioText: document.getElementById('profileBioText'),
+    editProfileBtn: document.getElementById('editProfileBtn'),
+    avatarPreview: document.getElementById('avatarPreview'),
+    avatarPreviewImg: document.getElementById('avatarPreviewImg'),
+    avatarPreviewEmoji: document.getElementById('avatarPreviewEmoji'),
+    avatarInput: document.getElementById('avatarInput'),
+    uploadAvatarBtn: document.getElementById('uploadAvatarBtn'),
+    removeAvatarBtn: document.getElementById('removeAvatarBtn'),
+    editDisplayName: document.getElementById('editDisplayName'),
+    editBio: document.getElementById('editBio'),
+    bioCharCount: document.getElementById('bioCharCount'),
+    cancelEditBtn: document.getElementById('cancelEditBtn'),
+    saveProfileBtn: document.getElementById('saveProfileBtn')
 };
 
 // ===== Unique ID Generation =====
@@ -139,6 +164,20 @@ function setupEventListeners() {
     });
     elements.reactionsModal.addEventListener('click', (e) => {
         if (e.target === elements.reactionsModal) closeModal(elements.reactionsModal);
+    });
+
+    // Profile
+    elements.profileBtn.addEventListener('click', openProfileModal);
+    elements.closeProfileModal.addEventListener('click', () => closeModal(elements.profileModal));
+    elements.editProfileBtn.addEventListener('click', switchToEditMode);
+    elements.cancelEditBtn.addEventListener('click', cancelEdit);
+    elements.uploadAvatarBtn.addEventListener('click', () => elements.avatarInput.click());
+    elements.avatarInput.addEventListener('change', handleAvatarUpload);
+    elements.removeAvatarBtn.addEventListener('click', removeAvatar);
+    elements.editBio.addEventListener('input', updateBioCharCount);
+    elements.saveProfileBtn.addEventListener('click', saveProfile);
+    elements.profileModal.addEventListener('click', (e) => {
+        if (e.target === elements.profileModal) closeModal(elements.profileModal);
     });
 }
 
@@ -237,6 +276,7 @@ async function handleRegister() {
             username: username.toLowerCase(),
             displayName: displayName,
             avatar: getRandomAvatar(),
+            bio: '', // Empty bio for new users
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             email: email
         });
@@ -897,6 +937,190 @@ function switchTab(tabName) {
 
     if (tabName === 'suggested') {
         renderSuggestedFriends();
+    }
+}
+
+// ===== Profile Functions =====
+let pendingAvatarData = null;
+
+async function openProfileModal() {
+    // Load current user data
+    const userDoc = await db.collection('users').doc(APP_STATE.currentUser.uid).get();
+    const userData = userDoc.data();
+
+    // Update profile view
+    elements.profileDisplayName.textContent = userData.displayName || userData.username;
+    elements.profileAccountId.textContent = userData.accountId;
+
+    // Display avatar
+    if (userData.avatarImage) {
+        elements.profileAvatarImg.src = userData.avatarImage;
+        elements.profileAvatarImg.style.display = 'block';
+        elements.profileAvatarEmoji.style.display = 'none';
+    } else {
+        elements.profileAvatarEmoji.textContent = userData.avatar || '👤';
+        elements.profileAvatarImg.style.display = 'none';
+        elements.profileAvatarEmoji.style.display = 'block';
+    }
+
+    // Display bio
+    elements.profileBioText.textContent = userData.bio || 'Chưa có tiểu sử';
+
+    // Get friend count
+    const friendsSnapshot = await db.collection('users').doc(APP_STATE.currentUser.uid)
+        .collection('friends').get();
+    elements.profileFriendCount.textContent = friendsSnapshot.size;
+
+    // Show modal
+    openModal(elements.profileModal);
+}
+
+function switchToEditMode() {
+    elements.profileView.style.display = 'none';
+    elements.profileEdit.style.display = 'block';
+
+    // Load current values
+    elements.editDisplayName.value = APP_STATE.currentUser.displayName || '';
+    elements.editBio.value = APP_STATE.currentUser.bio || '';
+    updateBioCharCount();
+
+    // Set avatar preview
+    if (APP_STATE.currentUser.avatarImage) {
+        elements.avatarPreviewImg.src = APP_STATE.currentUser.avatarImage;
+        elements.avatarPreviewImg.style.display = 'block';
+        elements.avatarPreviewEmoji.style.display = 'none';
+        elements.removeAvatarBtn.style.display = 'inline-block';
+    } else {
+        elements.avatarPreviewEmoji.textContent = APP_STATE.currentUser.avatar || '👤';
+        elements.avatarPreviewImg.style.display = 'none';
+        elements.avatarPreviewEmoji.style.display = 'block';
+        elements.removeAvatarBtn.style.display = 'none';
+    }
+}
+
+function cancelEdit() {
+    elements.profileEdit.style.display = 'none';
+    elements.profileView.style.display = 'block';
+    pendingAvatarData = null;
+}
+
+function handleAvatarUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        alert('Vui lòng chọn file ảnh!');
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            // Compress and resize to 200x200
+            const canvas = document.createElement('canvas');
+            const maxSize = 200;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+                if (width > maxSize) {
+                    height = (height / width) * maxSize;
+                    width = maxSize;
+                }
+            } else {
+                if (height > maxSize) {
+                    width = (width / height) * maxSize;
+                    height = maxSize;
+                }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+            pendingAvatarData = compressedData;
+
+            elements.avatarPreviewImg.src = compressedData;
+            elements.avatarPreviewImg.style.display = 'block';
+            elements.avatarPreviewEmoji.style.display = 'none';
+            elements.removeAvatarBtn.style.display = 'inline-block';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeAvatar() {
+    pendingAvatarData = 'removed';
+    elements.avatarPreviewImg.style.display = 'none';
+    elements.avatarPreviewEmoji.style.display = 'block';
+    elements.avatarPreviewEmoji.textContent = getRandomAvatar();
+    elements.removeAvatarBtn.style.display = 'none';
+}
+
+function updateBioCharCount() {
+    const length = elements.editBio.value.length;
+    elements.bioCharCount.textContent = `${length}/150`;
+}
+
+async function saveProfile() {
+    const newDisplayName = elements.editDisplayName.value.trim();
+    const newBio = elements.editBio.value.trim();
+
+    if (!newDisplayName) {
+        alert('Vui lòng nhập tên hiển thị!');
+        return;
+    }
+
+    if (newDisplayName.length > 30) {
+        alert('Tên hiển thị quá dài (tối đa 30 ký tự)!');
+        return;
+    }
+
+    if (newBio.length > 150) {
+        alert('Tiểu sử quá dài (tối đa 150 ký tự)!');
+        return;
+    }
+
+    try {
+        const updateData = {
+            displayName: newDisplayName,
+            bio: newBio
+        };
+
+        if (pendingAvatarData === 'removed') {
+            updateData.avatarImage = firebase.firestore.FieldValue.delete();
+            updateData.avatar = getRandomAvatar();
+        } else if (pendingAvatarData) {
+            updateData.avatarImage = pendingAvatarData;
+        }
+
+        await db.collection('users').doc(APP_STATE.currentUser.uid).update(updateData);
+
+        APP_STATE.currentUser.displayName = newDisplayName;
+        APP_STATE.currentUser.bio = newBio;
+        if (pendingAvatarData === 'removed') {
+            delete APP_STATE.currentUser.avatarImage;
+            APP_STATE.currentUser.avatar = updateData.avatar;
+        } else if (pendingAvatarData) {
+            APP_STATE.currentUser.avatarImage = pendingAvatarData;
+        }
+
+        pendingAvatarData = null;
+        await openProfileModal();
+        cancelEdit();
+
+    } catch (error) {
+        console.error('Save profile error:', error);
+        alert('Lỗi khi lưu profile: ' + error.message);
     }
 }
 
