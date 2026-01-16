@@ -1,75 +1,14 @@
+// ===== FIREBASE LOCKET APP - REAL-TIME VERSION =====
+// Uses Firebase Auth + Firestore for real online connections
+
 // ===== Application State =====
 const APP_STATE = {
     currentUser: null,
-    allAccounts: {}, // All registered accounts
-    friends: [],
-    photos: [],
-    suggestedFriends: [
-        { id: '@user1-52847', accountId: '@mavanh-52847', username: 'mavanh', name: 'Mai Anh', avatar: '👩', status: 'Online' },
-        { id: '@user2-39201', accountId: '@tuankiet-39201', username: 'tuankiet', name: 'Tuấn Kiệt', avatar: '👨', status: 'Online' },
-        { id: '@user3-76543', accountId: '@linhchi-76543', username: 'linhchi', name: 'Linh Chi', avatar: '👧', status: 'Offline' },
-        { id: '@user4-12098', accountId: '@minhduc-12098', username: 'minhduc', name: 'Minh Đức', avatar: '🧑', status: 'Online' },
-        { id: '@user5-88432', accountId: '@huonggiang-88432', username: 'huonggiang', name: 'Hương Giang', avatar: '👩‍🦰', status: 'Online' },
-        { id: '@user6-65109', accountId: '@quocbao-65109', username: 'quocbao', name: 'Quốc Bảo', avatar: '👦', status: 'Offline' }
-    ],
+    unsubscribers: [], // Store Firestore listeners for cleanup
     currentPhotoData: null,
     currentReactionPhotoId: null,
     stream: null
 };
-
-// ===== Password Encryption (Basic - Demo Only) =====
-function encryptPassword(password) {
-    // Basic Base64 encoding for demo - NOT secure for production
-    return btoa(password);
-}
-
-function decryptPassword(encrypted) {
-    return atob(encrypted);
-}
-
-// ===== Unique ID Generation =====
-function generateAccountId(username) {
-    // Generate 5-digit random number
-    const randomNum = Math.floor(10000 + Math.random() * 90000);
-    const accountId = `@${username.toLowerCase()}-${randomNum}`;
-
-    // Check if ID already exists (collision detection)
-    if (APP_STATE.allAccounts[accountId]) {
-        // Recursively try again if collision occurs
-        return generateAccountId(username);
-    }
-
-    return accountId;
-}
-
-// ===== LocalStorage Helper Functions =====
-function saveToStorage() {
-    localStorage.setItem('locketAppState', JSON.stringify({
-        currentUser: APP_STATE.currentUser,
-        friends: APP_STATE.friends,
-        photos: APP_STATE.photos
-    }));
-
-    // Save all accounts separately
-    localStorage.setItem('locketAllAccounts', JSON.stringify(APP_STATE.allAccounts));
-}
-
-function loadFromStorage() {
-    // Load accounts first
-    const savedAccounts = localStorage.getItem('locketAllAccounts');
-    if (savedAccounts) {
-        APP_STATE.allAccounts = JSON.parse(savedAccounts);
-    }
-
-    // Load user state
-    const saved = localStorage.getItem('locketAppState');
-    if (saved) {
-        const data = JSON.parse(saved);
-        APP_STATE.currentUser = data.currentUser;
-        APP_STATE.friends = data.friends || [];
-        APP_STATE.photos = data.photos || [];
-    }
-}
 
 // ===== DOM Elements =====
 const elements = {
@@ -111,20 +50,37 @@ const elements = {
     friendCount: document.querySelector('.friend-count')
 };
 
-// ===== Initialization =====
-function init() {
-    loadFromStorage();
-
-    if (APP_STATE.currentUser && APP_STATE.currentUser.accountId) {
-        showApp();
-    } else {
-        elements.authModal.classList.add('active');
-    }
-
-    setupEventListeners();
-    initCamera();
+// ===== Unique ID Generation =====
+function generateAccountId(username) {
+    const randomNum = Math.floor(10000 + Math.random() * 90000);
+    return `@${username.toLowerCase()}-${randomNum}`;
 }
 
+function getRandomAvatar() {
+    const avatars = ['👤', '😊', '🌟', '✨', '💫', '🎨', '📸', '🎭'];
+    return avatars[Math.floor(Math.random() * avatars.length)];
+}
+
+// ===== Initialization =====
+function init() {
+    setupEventListeners();
+    initCamera();
+
+    // Listen for auth state changes
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            // User is signed in
+            await loadUserData(user.uid);
+            showApp();
+        } else {
+            // User is signed out
+            elements.authModal.classList.add('active');
+            elements.app.style.display = 'none';
+        }
+    });
+}
+
+// ===== Event Listeners Setup =====
 function setupEventListeners() {
     // Auth tabs
     document.querySelectorAll('.auth-tab-btn').forEach(btn => {
@@ -188,7 +144,6 @@ function setupEventListeners() {
 
 // ===== Authentication Functions =====
 function switchAuthTab(tabName) {
-    // Clear errors
     elements.regError.textContent = '';
     elements.loginError.textContent = '';
 
@@ -209,13 +164,12 @@ function switchAuthTab(tabName) {
     }
 }
 
-function handleRegister() {
+async function handleRegister() {
     const username = elements.regUsername.value.trim();
     const password = elements.regPassword.value;
     const confirmPassword = elements.regConfirmPassword.value;
     const displayName = elements.regDisplayName.value.trim() || username;
 
-    // Clear previous errors
     elements.regError.textContent = '';
 
     // Validation
@@ -249,51 +203,55 @@ function handleRegister() {
         return;
     }
 
-    // Check if username already exists
-    const existingAccount = Object.values(APP_STATE.allAccounts).find(
-        acc => acc.username.toLowerCase() === username.toLowerCase()
-    );
+    try {
+        // Check if username already exists
+        const usernameQuery = await db.collection('users')
+            .where('username', '==', username.toLowerCase())
+            .get();
 
-    if (existingAccount) {
-        elements.regError.textContent = 'Tên người dùng đã tồn tại!';
-        return;
+        if (!usernameQuery.empty) {
+            elements.regError.textContent = 'Tên người dùng đã tồn tại!';
+            return;
+        }
+
+        // Generate unique account ID
+        let accountId;
+        let isUnique = false;
+
+        while (!isUnique) {
+            accountId = generateAccountId(username);
+            const idQuery = await db.collection('users')
+                .where('accountId', '==', accountId)
+                .get();
+            isUnique = idQuery.empty;
+        }
+
+        // Create Firebase Auth account
+        const email = `${accountId.replace('@', '')}@locket.app`;
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+
+        // Store user data in Firestore
+        await db.collection('users').doc(user.uid).set({
+            accountId: accountId,
+            username: username.toLowerCase(),
+            displayName: displayName,
+            avatar: getRandomAvatar(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            email: email
+        });
+
+        elements.regError.innerHTML = `<div class="success-message">✅ Tài khoản đã được tạo! ID của bạn: <strong>${accountId}</strong></div>`;
+
+        // Auto-login happens via onAuthStateChanged
+
+    } catch (error) {
+        console.error('Registration error:', error);
+        elements.regError.textContent = `Lỗi: ${error.message}`;
     }
-
-    // Generate unique account ID
-    const accountId = generateAccountId(username);
-
-    // Create account
-    const newAccount = {
-        accountId: accountId,
-        username: username,
-        displayName: displayName,
-        password: encryptPassword(password),
-        avatar: getRandomAvatar(),
-        createdAt: new Date().toISOString()
-    };
-
-    // Save account
-    APP_STATE.allAccounts[accountId] = newAccount;
-
-    // Set as current user
-    APP_STATE.currentUser = {
-        accountId: newAccount.accountId,
-        username: newAccount.username,
-        name: newAccount.displayName,
-        avatar: newAccount.avatar
-    };
-
-    saveToStorage();
-
-    // Show success message briefly
-    elements.regError.innerHTML = `<div class="success-message">✅ Tài khoản đã được tạo! ID của bạn: <strong>${accountId}</strong></div>`;
-
-    setTimeout(() => {
-        showApp();
-    }, 2000);
 }
 
-function handleLogin() {
+async function handleLogin() {
     const usernameOrId = elements.loginUsername.value.trim();
     const password = elements.loginPassword.value;
 
@@ -309,76 +267,55 @@ function handleLogin() {
         return;
     }
 
-    // Find account by accountId or username
-    let account = null;
-
-    if (usernameOrId.startsWith('@')) {
-        // Search by account ID
-        account = APP_STATE.allAccounts[usernameOrId];
-    } else {
-        // Search by username
-        account = Object.values(APP_STATE.allAccounts).find(
-            acc => acc.username.toLowerCase() === usernameOrId.toLowerCase()
-        );
-    }
-
-    if (!account) {
-        elements.loginError.textContent = 'Tài khoản không tồn tại!';
-        return;
-    }
-
-    // Verify password
     try {
-        if (decryptPassword(account.password) !== password) {
-            elements.loginError.textContent = 'Mật khẩu không đúng!';
-            return;
+        let email;
+
+        if (usernameOrId.startsWith('@')) {
+            // Login with account ID
+            email = `${usernameOrId.replace('@', '')}@locket.app`;
+        } else {
+            // Login with username - need to find the email
+            const userQuery = await db.collection('users')
+                .where('username', '==', usernameOrId.toLowerCase())
+                .limit(1)
+                .get();
+
+            if (userQuery.empty) {
+                elements.loginError.textContent = 'Tài khoản không tồn tại!';
+                return;
+            }
+
+            email = userQuery.docs[0].data().email;
         }
-    } catch (e) {
-        elements.loginError.textContent = 'Lỗi xác thực!';
-        return;
+
+        await auth.signInWithEmailAndPassword(email, password);
+        // Login success - onAuthStateChanged will handle the rest
+
+    } catch (error) {
+        console.error('Login error:', error);
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
+            elements.loginError.textContent = 'Tên người dùng hoặc mật khẩu không đúng!';
+        } else {
+            elements.loginError.textContent = `Lỗi: ${error.message}`;
+        }
     }
-
-    // Set as current user
-    APP_STATE.currentUser = {
-        accountId: account.accountId,
-        username: account.username,
-        name: account.displayName,
-        avatar: account.avatar
-    };
-
-    saveToStorage();
-    showApp();
 }
 
-function handleLogout() {
+async function handleLogout() {
     const confirmed = confirm('Bạn có chắc chắn muốn đăng xuất?');
     if (confirmed) {
-        APP_STATE.currentUser = null;
-        APP_STATE.friends = [];
-        APP_STATE.photos = [];
-        localStorage.removeItem('locketAppState');
+        // Cleanup listeners
+        APP_STATE.unsubscribers.forEach(unsub => unsub());
+        APP_STATE.unsubscribers = [];
 
-        // Show auth modal
-        elements.authModal.classList.add('active');
-        elements.app.style.display = 'none';
-
-        // Reset forms
-        elements.regUsername.value = '';
-        elements.regPassword.value = '';
-        elements.regConfirmPassword.value = '';
-        elements.regDisplayName.value = '';
-        elements.loginUsername.value = '';
-        elements.loginPassword.value = '';
-        elements.regError.textContent = '';
-        elements.loginError.textContent = '';
-        switchAuthTab('register');
+        await auth.signOut();
+        // onAuthStateChanged will handle UI updates
     }
 }
 
 function copyAccountId() {
     const accountId = APP_STATE.currentUser.accountId;
     navigator.clipboard.writeText(accountId).then(() => {
-        // Visual feedback
         const originalText = elements.displayAccountId.textContent;
         elements.displayAccountId.textContent = 'Đã sao chép!';
         setTimeout(() => {
@@ -389,28 +326,87 @@ function copyAccountId() {
     });
 }
 
+// ===== User Data Management =====
+async function loadUserData(uid) {
+    try {
+        const userDoc = await db.collection('users').doc(uid).get();
+
+        if (userDoc.exists) {
+            APP_STATE.currentUser = {
+                uid: uid,
+                ...userDoc.data()
+            };
+        } else {
+            console.error('User document not found');
+            await auth.signOut();
+            return;
+        }
+    } catch (error) {
+        console.error('Error loading user data:', error);
+    }
+}
+
 function showApp() {
     elements.authModal.classList.remove('active');
     elements.app.style.display = 'block';
     elements.displayAccountId.textContent = APP_STATE.currentUser.accountId;
+
+    // Setup real-time listeners
+    setupFriendsListener();
+    setupPhotosListener();
+
     updateFriendCount();
-    renderFriends();
-    renderSuggestedFriends();
-    renderFeed();
+}
 
-    // Generate some demo photos if empty
-    if (APP_STATE.photos.length === 0) {
-        generateDemoPhotos();
+// ===== Friends Management =====
+function setupFriendsListener() {
+    const friendsRef = db.collection('users').doc(APP_STATE.currentUser.uid)
+        .collection('friends');
+
+    const unsubscribe = friendsRef.onSnapshot((snapshot) => {
+        renderFriends(snapshot);
+        updateFriendCount();
+    });
+
+    APP_STATE.unsubscribers.push(unsubscribe);
+}
+
+function renderFriends(snapshot) {
+    if (!snapshot || snapshot.empty) {
+        elements.friendsList.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">👥</div>
+                <p>Bạn chưa có bạn bè nào</p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Tìm bạn bằng ID tài khoản!</p>
+            </div>
+        `;
+        return;
     }
+
+    const friends = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    elements.friendsList.innerHTML = friends.map(friend => `
+        <div class="friend-item">
+            <div class="friend-avatar">${friend.avatar}</div>
+            <div class="friend-info">
+                <h4>${friend.displayName}</h4>
+                <p>${friend.accountId}</p>
+            </div>
+            <button class="friend-action remove" onclick="removeFriend('${friend.friendUid}')">Xóa</button>
+        </div>
+    `).join('');
 }
 
-function getRandomAvatar() {
-    const avatars = ['👤', '😊', '🌟', '✨', '💫', '🎨', '📸', '🎭'];
-    return avatars[Math.floor(Math.random() * avatars.length)];
+function updateFriendCount() {
+    db.collection('users').doc(APP_STATE.currentUser.uid)
+        .collection('friends')
+        .get()
+        .then(snapshot => {
+            elements.friendCount.textContent = snapshot.size;
+        });
 }
 
-// ===== Friend Search =====
-function handleFriendSearch() {
+async function handleFriendSearch() {
     const searchQuery = elements.friendSearchInput.value.trim();
 
     if (!searchQuery) {
@@ -418,11 +414,22 @@ function handleFriendSearch() {
         return;
     }
 
-    // Search by account ID
-    if (searchQuery.startsWith('@')) {
-        const account = APP_STATE.allAccounts[searchQuery];
+    if (!searchQuery.startsWith('@')) {
+        elements.searchResults.innerHTML = `
+            <div class="search-no-results">
+                💡 Vui lòng nhập ID tài khoản (bắt đầu bằng @)
+            </div>
+        `;
+        return;
+    }
 
-        if (!account) {
+    try {
+        const userQuery = await db.collection('users')
+            .where('accountId', '==', searchQuery)
+            .limit(1)
+            .get();
+
+        if (userQuery.empty) {
             elements.searchResults.innerHTML = `
                 <div class="search-no-results">
                     ❌ Không tìm thấy tài khoản với ID: ${searchQuery}
@@ -431,8 +438,10 @@ function handleFriendSearch() {
             return;
         }
 
-        // Check if it's the current user
-        if (account.accountId === APP_STATE.currentUser.accountId) {
+        const userData = userQuery.docs[0].data();
+        const userUid = userQuery.docs[0].id;
+
+        if (userUid === APP_STATE.currentUser.uid) {
             elements.searchResults.innerHTML = `
                 <div class="search-no-results">
                     ℹ️ Đây là tài khoản của bạn
@@ -442,15 +451,16 @@ function handleFriendSearch() {
         }
 
         // Check if already friends
-        const alreadyFriend = APP_STATE.friends.find(f => f.accountId === account.accountId);
+        const friendDoc = await db.collection('users').doc(APP_STATE.currentUser.uid)
+            .collection('friends').doc(userUid).get();
 
-        if (alreadyFriend) {
+        if (friendDoc.exists) {
             elements.searchResults.innerHTML = `
                 <div class="search-result-item">
-                    <div class="friend-avatar">${account.avatar}</div>
+                    <div class="friend-avatar">${userData.avatar}</div>
                     <div class="friend-info">
-                        <h4>${account.displayName}</h4>
-                        <p>${account.accountId}</p>
+                        <h4>${userData.displayName}</h4>
+                        <p>${userData.accountId}</p>
                     </div>
                     <button class="friend-action" disabled style="opacity: 0.5;">Đã kết bạn</button>
                 </div>
@@ -458,54 +468,90 @@ function handleFriendSearch() {
         } else {
             elements.searchResults.innerHTML = `
                 <div class="search-result-item">
-                    <div class="friend-avatar">${account.avatar}</div>
+                    <div class="friend-avatar">${userData.avatar}</div>
                     <div class="friend-info">
-                        <h4>${account.displayName}</h4>
-                        <p>${account.accountId}</p>
+                        <h4>${userData.displayName}</h4>
+                        <p>${userData.accountId}</p>
                     </div>
-                    <button class="friend-action" onclick="addFriendByAccountId('${account.accountId}')">Thêm bạn</button>
+                    <button class="friend-action" onclick="addFriendByUid('${userUid}', '${userData.accountId}', '${userData.displayName}', '${userData.avatar}')">Thêm bạn</button>
                 </div>
             `;
         }
-    } else {
+    } catch (error) {
+        console.error('Friend search error:', error);
         elements.searchResults.innerHTML = `
             <div class="search-no-results">
-                💡 Vui lòng nhập ID tài khoản (bắt đầu bằng @)
+                ❌ Lỗi tìm kiếm: ${error.message}
             </div>
         `;
     }
 }
 
-function addFriendByAccountId(accountId) {
-    const account = APP_STATE.allAccounts[accountId];
-    if (!account) return;
+async function addFriendByUid(friendUid, accountId, displayName, avatar) {
+    try {
+        // Add to current user's friends
+        await db.collection('users').doc(APP_STATE.currentUser.uid)
+            .collection('friends').doc(friendUid).set({
+                friendUid: friendUid,
+                accountId: accountId,
+                displayName: displayName,
+                avatar: avatar,
+                addedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-    const friend = {
-        id: account.accountId,
-        accountId: account.accountId,
-        username: account.username,
-        name: account.displayName,
-        avatar: account.avatar,
-        status: 'Online'
-    };
+        // Add current user to friend's friends list
+        await db.collection('users').doc(friendUid)
+            .collection('friends').doc(APP_STATE.currentUser.uid).set({
+                friendUid: APP_STATE.currentUser.uid,
+                accountId: APP_STATE.currentUser.accountId,
+                displayName: APP_STATE.currentUser.displayName,
+                avatar: APP_STATE.currentUser.avatar,
+                addedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
 
-    APP_STATE.friends.push(friend);
-    saveToStorage();
-    updateFriendCount();
-    renderFriends();
-    renderSuggestedFriends();
+        elements.friendSearchInput.value = '';
+        elements.searchResults.innerHTML = `
+            <div class="search-no-results" style="color: #43e97b;">
+                ✅ Đã thêm ${displayName} vào danh sách bạn bè!
+            </div>
+        `;
 
-    // Clear search
-    elements.friendSearchInput.value = '';
-    elements.searchResults.innerHTML = `
-        <div class="search-no-results" style="color: #43e97b;">
-            ✅ Đã thêm ${friend.name} vào danh sách bạn bè!
+        setTimeout(() => {
+            elements.searchResults.innerHTML = '';
+        }, 2000);
+
+    } catch (error) {
+        console.error('Add friend error:', error);
+        alert('Lỗi khi thêm bạn: ' + error.message);
+    }
+}
+
+async function removeFriend(friendUid) {
+    try {
+        // Remove from current user's friends
+        await db.collection('users').doc(APP_STATE.currentUser.uid)
+            .collection('friends').doc(friendUid).delete();
+
+        // Remove current user from friend's friends list
+        await db.collection('users').doc(friendUid)
+            .collection('friends').doc(APP_STATE.currentUser.uid).delete();
+
+    } catch (error) {
+        console.error('Remove friend error:', error);
+        alert('Lỗi khi xóa bạn: ' + error.message);
+    }
+}
+
+function renderSuggestedFriends() {
+    // For now, show empty state
+    // In future, can implement friend suggestions based on mutual friends, etc.
+    elements.suggestedList.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon">🔍</div>
+            <p>Sử dụng tìm kiếm để thêm bạn bè!</p>
+            <p style="font-size: 0.9rem; margin-top: 0.5rem;">Nhập ID tài khoản vào ô tìm kiếm ở trên</p>
         </div>
     `;
-
-    setTimeout(() => {
-        elements.searchResults.innerHTML = '';
-    }, 2000);
 }
 
 // ===== Camera Functions =====
@@ -540,23 +586,16 @@ function capturePhoto() {
     const canvas = elements.photoCanvas;
     const ctx = canvas.getContext('2d');
 
-    // Set canvas size to match video
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-
-    // Draw current video frame to canvas
     ctx.drawImage(video, 0, 0);
 
-    // Get image data
     const imageData = canvas.toDataURL('image/jpeg', 0.9);
 
-    // Store and display
     APP_STATE.currentPhotoData = imageData;
     elements.capturedImg.src = imageData;
     elements.capturedPhoto.style.display = 'block';
     elements.captionSection.style.display = 'block';
-
-    // Hide capture button temporarily
     elements.captureBtn.style.display = 'none';
 }
 
@@ -568,130 +607,74 @@ function cancelPhoto() {
     elements.captureBtn.style.display = 'block';
 }
 
-function postPhoto() {
+async function postPhoto() {
     if (!APP_STATE.currentPhotoData) return;
 
-    const newPhoto = {
-        id: Date.now().toString(),
-        userId: APP_STATE.currentUser.accountId,
-        userName: APP_STATE.currentUser.name,
-        userAvatar: APP_STATE.currentUser.avatar,
-        image: APP_STATE.currentPhotoData,
-        caption: elements.captionInput.value.trim(),
-        timestamp: new Date().toISOString(),
-        reactions: {}
-    };
+    try {
+        await db.collection('photos').add({
+            userId: APP_STATE.currentUser.uid,
+            userName: APP_STATE.currentUser.displayName,
+            userAvatar: APP_STATE.currentUser.avatar,
+            accountId: APP_STATE.currentUser.accountId,
+            image: APP_STATE.currentPhotoData,
+            caption: elements.captionInput.value.trim(),
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            createdAt: new Date().toISOString() // For sorting before server timestamp arrives
+        });
 
-    APP_STATE.photos.unshift(newPhoto);
-    saveToStorage();
-    renderFeed();
-    cancelPhoto();
+        cancelPhoto();
 
-    // Scroll to feed
-    setTimeout(() => {
-        document.querySelector('.feed-section').scrollIntoView({ behavior: 'smooth' });
-    }, 300);
-}
+        setTimeout(() => {
+            document.querySelector('.feed-section').scrollIntoView({ behavior: 'smooth' });
+        }, 300);
 
-// ===== Friends Functions =====
-function updateFriendCount() {
-    elements.friendCount.textContent = APP_STATE.friends.length;
-}
-
-function renderFriends() {
-    if (APP_STATE.friends.length === 0) {
-        elements.friendsList.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">👥</div>
-                <p>Bạn chưa có bạn bè nào</p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Tìm bạn bằng ID tài khoản!</p>
-            </div>
-        `;
-        return;
-    }
-
-    elements.friendsList.innerHTML = APP_STATE.friends.map(friend => `
-        <div class="friend-item">
-            <div class="friend-avatar">${friend.avatar}</div>
-            <div class="friend-info">
-                <h4>${friend.name}</h4>
-                <p>${friend.accountId || friend.id}</p>
-            </div>
-            <button class="friend-action remove" onclick="removeFriend('${friend.accountId || friend.id}')">Xóa</button>
-        </div>
-    `).join('');
-}
-
-function renderSuggestedFriends() {
-    const availableSuggestions = APP_STATE.suggestedFriends.filter(
-        suggested => !APP_STATE.friends.find(friend => friend.accountId === suggested.accountId)
-    );
-
-    if (availableSuggestions.length === 0) {
-        elements.suggestedList.innerHTML = `
-            <div class="empty-state">
-                <div class="empty-state-icon">✨</div>
-                <p>Không có gợi ý thêm</p>
-            </div>
-        `;
-        return;
-    }
-
-    elements.suggestedList.innerHTML = availableSuggestions.map(friend => `
-        <div class="friend-item">
-            <div class="friend-avatar">${friend.avatar}</div>
-            <div class="friend-info">
-                <h4>${friend.name}</h4>
-                <p>${friend.accountId}</p>
-            </div>
-            <button class="friend-action" onclick="addFriend('${friend.accountId}')">Thêm bạn</button>
-        </div>
-    `).join('');
-}
-
-function addFriend(accountId) {
-    const friend = APP_STATE.suggestedFriends.find(f => f.accountId === accountId);
-    if (friend && !APP_STATE.friends.find(f => f.accountId === accountId)) {
-        APP_STATE.friends.push(friend);
-        saveToStorage();
-        updateFriendCount();
-        renderFriends();
-        renderSuggestedFriends();
-
-        // Generate a photo from this friend
-        generateFriendPhoto(friend);
+    } catch (error) {
+        console.error('Post photo error:', error);
+        alert('Lỗi khi đăng ảnh: ' + error.message);
     }
 }
 
-function removeFriend(friendAccountId) {
-    APP_STATE.friends = APP_STATE.friends.filter(f => (f.accountId || f.id) !== friendAccountId);
-    saveToStorage();
-    updateFriendCount();
-    renderFriends();
-    renderSuggestedFriends();
+// ===== Photos Feed =====
+function setupPhotosListener() {
+    // Get friend UIDs
+    db.collection('users').doc(APP_STATE.currentUser.uid)
+        .collection('friends')
+        .get()
+        .then(friendsSnapshot => {
+            const friendUids = friendsSnapshot.docs.map(doc => doc.data().friendUid);
+            friendUids.push(APP_STATE.currentUser.uid); // Include own photos
+
+            // Listen to photos from user and friends
+            const photosRef = db.collection('photos')
+                .where('userId', 'in', friendUids.slice(0, 10)) // Firestore limit is 10 for 'in' queries
+                .orderBy('timestamp', 'desc')
+                .limit(50);
+
+            const unsubscribe = photosRef.onSnapshot((snapshot) => {
+                renderFeed(snapshot);
+            });
+
+            APP_STATE.unsubscribers.push(unsubscribe);
+        });
 }
 
-// ===== Feed Functions =====
-function renderFeed() {
-    if (APP_STATE.photos.length === 0) {
+function renderFeed(snapshot) {
+    if (!snapshot || snapshot.empty) {
         elements.photoFeed.innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">📸</div>
                 <p>Chưa có ảnh nào</p>
-                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Chụp ảnh đầu tiên của bạn!</p>
+                <p style="font-size: 0.9rem; margin-top: 0.5rem;">Chụp ảnh đầu tiên của bạn hoặc thêm bạn bè!</p>
             </div>
         `;
         return;
     }
 
-    elements.photoFeed.innerHTML = APP_STATE.photos.map(photo => {
-        const reactionsHTML = Object.keys(photo.reactions).length > 0
-            ? `<div class="reactions-display">
-                ${Object.entries(photo.reactions).map(([emoji, users]) =>
-                `<div class="reaction-item">${emoji} ${users.length}</div>`
-            ).join('')}
-               </div>`
-            : '';
+    const photos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    elements.photoFeed.innerHTML = photos.map(photo => {
+        // Get reactions
+        const reactionsHTML = '';  // Will implement reactions next
 
         return `
             <div class="photo-card">
@@ -699,7 +682,7 @@ function renderFeed() {
                     <div class="user-avatar">${photo.userAvatar}</div>
                     <div class="user-info">
                         <h3>${photo.userName}</h3>
-                        <p>${formatTimestamp(photo.timestamp)}</p>
+                        <p>${formatTimestamp(photo.timestamp || photo.createdAt)}</p>
                     </div>
                 </div>
                 <div class="photo-card-image">
@@ -712,15 +695,22 @@ function renderFeed() {
                             😊 Thả cảm xúc
                         </button>
                     </div>
-                    ${reactionsHTML}
+                    <div id="reactionsContainer-${photo.id}"></div>
                 </div>
             </div>
         `;
     }).join('');
+
+    // Setup reactions listeners for each photo
+    photos.forEach(photo => {
+        setupReactionsListener(photo.id);
+    });
 }
 
 function formatTimestamp(timestamp) {
-    const date = new Date(timestamp);
+    if (!timestamp) return 'Vừa xong';
+
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     const now = new Date();
     const diff = now - date;
 
@@ -736,32 +726,69 @@ function formatTimestamp(timestamp) {
     return date.toLocaleDateString('vi-VN');
 }
 
-// ===== Reactions Functions =====
+// ===== Reactions =====
+function setupReactionsListener(photoId) {
+    const reactionsRef = db.collection('photos').doc(photoId)
+        .collection('reactions');
+
+    reactionsRef.onSnapshot((snapshot) => {
+        if (snapshot.empty) return;
+
+        const reactions = {};
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (!reactions[data.emoji]) {
+                reactions[data.emoji] = [];
+            }
+            reactions[data.emoji].push(data.userName);
+        });
+
+        const container = document.getElementById(`reactionsContainer-${photoId}`);
+        if (container) {
+            container.innerHTML = `
+                <div class="reactions-display">
+                    ${Object.entries(reactions).map(([emoji, users]) =>
+                `<div class="reaction-item">${emoji} ${users.length}</div>`
+            ).join('')}
+                </div>
+            `;
+        }
+    });
+}
+
 function openReactionModal(photoId) {
     APP_STATE.currentReactionPhotoId = photoId;
     openModal(elements.reactionsModal);
 }
 
-function addReaction(emoji) {
+async function addReaction(emoji) {
     if (!APP_STATE.currentReactionPhotoId) return;
 
-    const photo = APP_STATE.photos.find(p => p.id === APP_STATE.currentReactionPhotoId);
-    if (!photo) return;
+    try {
+        const photoRef = db.collection('photos').doc(APP_STATE.currentReactionPhotoId);
+        const reactionsRef = photoRef.collection('reactions');
 
-    if (!photo.reactions[emoji]) {
-        photo.reactions[emoji] = [];
+        // Check if user already reacted with this emoji
+        const existingReaction = await reactionsRef
+            .where('userId', '==', APP_STATE.currentUser.uid)
+            .where('emoji', '==', emoji)
+            .get();
+
+        if (existingReaction.empty) {
+            // Add new reaction
+            await reactionsRef.add({
+                userId: APP_STATE.currentUser.uid,
+                userName: APP_STATE.currentUser.displayName,
+                emoji: emoji,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        }
+
+        closeModal(elements.reactionsModal);
+
+    } catch (error) {
+        console.error('Add reaction error:', error);
     }
-
-    // Check if user already reacted with this emoji
-    const userName = APP_STATE.currentUser.name;
-    const userIndex = photo.reactions[emoji].indexOf(userName);
-    if (userIndex === -1) {
-        photo.reactions[emoji].push(userName);
-    }
-
-    saveToStorage();
-    renderFeed();
-    closeModal(elements.reactionsModal);
 }
 
 // ===== Modal Functions =====
@@ -774,7 +801,6 @@ function closeModal(modal) {
 }
 
 function switchTab(tabName) {
-    // Update tab buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.dataset.tab === tabName) {
@@ -782,7 +808,6 @@ function switchTab(tabName) {
         }
     });
 
-    // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
     });
@@ -791,132 +816,10 @@ function switchTab(tabName) {
         ? document.getElementById('myFriendsTab')
         : document.getElementById('suggestedTab');
     targetContent.classList.add('active');
-}
 
-// ===== Demo Data Generation =====
-function generateDemoPhotos() {
-    const demoPhotos = [
-        {
-            userId: '@mavanh-52847',
-            userName: 'Mai Anh',
-            userAvatar: '👩',
-            caption: 'Buổi sáng tươi đẹp ☀️',
-            color: '#FF6B9D'
-        },
-        {
-            userId: '@tuankiet-39201',
-            userName: 'Tuấn Kiệt',
-            userAvatar: '👨',
-            caption: 'Coffee time ☕',
-            color: '#4ECDC4'
-        },
-        {
-            userId: '@huonggiang-88432',
-            userName: 'Hương Giang',
-            userAvatar: '👩‍🦰',
-            caption: 'Cuối tuần vui vẻ! 🎉',
-            color: '#95E1D3'
-        }
-    ];
-
-    demoPhotos.forEach((demo, index) => {
-        const canvas = document.createElement('canvas');
-        canvas.width = 800;
-        canvas.height = 800;
-        const ctx = canvas.getContext('2d');
-
-        // Create gradient background
-        const gradient = ctx.createLinearGradient(0, 0, 800, 800);
-        gradient.addColorStop(0, demo.color);
-        gradient.addColorStop(1, adjustColor(demo.color, -40));
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 800, 800);
-
-        // Add some decorative elements
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.beginPath();
-        ctx.arc(600, 200, 150, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(200, 600, 100, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Add emoji
-        ctx.font = 'bold 200px Arial';
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(demo.userAvatar, 400, 400);
-
-        const photo = {
-            id: `demo-${index}-${Date.now()}`,
-            userId: demo.userId,
-            userName: demo.userName,
-            userAvatar: demo.userAvatar,
-            image: canvas.toDataURL('image/jpeg', 0.9),
-            caption: demo.caption,
-            timestamp: new Date(Date.now() - (index * 3600000)).toISOString(),
-            reactions: {}
-        };
-
-        APP_STATE.photos.push(photo);
-    });
-
-    saveToStorage();
-    renderFeed();
-}
-
-function generateFriendPhoto(friend) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 800;
-    canvas.height = 800;
-    const ctx = canvas.getContext('2d');
-
-    // Random color
-    const colors = ['#667eea', '#f093fb', '#4facfe', '#43e97b', '#fa709a'];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-
-    const gradient = ctx.createLinearGradient(0, 0, 800, 800);
-    gradient.addColorStop(0, color);
-    gradient.addColorStop(1, adjustColor(color, -40));
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 800, 800);
-
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
-    ctx.beginPath();
-    ctx.arc(600, 200, 150, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.font = 'bold 200px Arial';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(friend.avatar, 400, 400);
-
-    const captions = ['Hey! 👋', 'Chào bạn! ✨', 'Nice day 🌟', 'Yeahh! 🎉'];
-
-    const photo = {
-        id: `${friend.accountId}-${Date.now()}`,
-        userId: friend.accountId,
-        userName: friend.name,
-        userAvatar: friend.avatar,
-        image: canvas.toDataURL('image/jpeg', 0.9),
-        caption: captions[Math.floor(Math.random() * captions.length)],
-        timestamp: new Date(Date.now() - Math.random() * 7200000).toISOString(),
-        reactions: {}
-    };
-
-    APP_STATE.photos.unshift(photo);
-    saveToStorage();
-    renderFeed();
-}
-
-function adjustColor(color, amount) {
-    const num = parseInt(color.replace('#', ''), 16);
-    const r = Math.max(0, Math.min(255, (num >> 16) + amount));
-    const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
-    const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
-    return '#' + ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+    if (tabName === 'suggested') {
+        renderSuggestedFriends();
+    }
 }
 
 // ===== Start Application =====
