@@ -754,6 +754,40 @@ async function initCamera() {
     }
 }
 
+// Flip between front and rear camera
+async function flipCamera() {
+    try {
+        if (currentStream) {
+            currentStream.getTracks().forEach(track => track.stop());
+        }
+
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+
+        const constraints = {
+            video: {
+                width: { ideal: 1080 },
+                height: { ideal: 1080 },
+                facingMode: currentFacingMode
+            },
+            audio: false
+        };
+
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        elements.cameraPreview.srcObject = currentStream;
+        APP_STATE.stream = currentStream;
+
+        // Apply mirror ONLY for front camera
+        if (currentFacingMode === 'user') {
+            elements.cameraPreview.style.transform = 'scaleX(-1)';
+        } else {
+            elements.cameraPreview.style.transform = 'scaleX(1)';
+        }
+    } catch (error) {
+        console.error('Flip camera error:', error);
+        alert('Không thể chuyển camera');
+    }
+}
+
 function capturePhoto() {
     const video = elements.cameraPreview;
     const canvas = elements.photoCanvas;
