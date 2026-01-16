@@ -407,7 +407,7 @@ function showApp() {
     // Setup real-time listeners
     setupFriendsListener();
     setupPhotosListener();
-
+    setupNotificationsListener();
     updateFriendCount();
 }
 
@@ -1275,6 +1275,15 @@ async function postComment(photoId) {
             });
 
         input.value = '';
+
+        // Send notification to photo owner
+        const photoDoc = await db.collection('photos').doc(photoId).get();
+        if (photoDoc.exists) {
+            await createNotification(photoDoc.data().userId, 'comment', {
+                photoId: photoId,
+                message: 'đã bình luận ảnh của bạn'
+            });
+        }
     } catch (error) {
         console.error('Post comment error:', error);
         alert('Lỗi khi đăng bình luận: ' + error.message);
@@ -1306,23 +1315,54 @@ function renderComments(photoId, snapshot) {
     }
 
     const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const parentComments = comments.filter(c => !c.replyTo);
 
     countElement.textContent = `${comments.length} bình luận`;
 
-    container.innerHTML = comments.map(comment => {
+    container.innerHTML = parentComments.map(comment => {
+        const replies = comments.filter(c => c.replyTo === comment.id);
         const avatarHTML = comment.userAvatarImage
             ? `<img src="${comment.userAvatarImage}" alt="Avatar">`
             : (comment.userAvatar || '👤');
 
         return `
             <div class="comment-item">
-                <div class="comment-avatar">${avatarHTML}</div>
+                <div class="comment-avatar" onclick="viewUserProfile('${comment.userId}')">${avatarHTML}</div>
                 <div class="comment-content">
                     <div class="comment-author">${comment.userName}</div>
                     <div class="comment-text">${comment.comment}</div>
                     <div class="comment-time">${formatTimestamp(comment.createdAt)}</div>
+                    <div class="comment-actions">
+                        <button class="reply-btn" onclick="showReplyInput('${photoId}', '${comment.id}', '${comment.userName}')">Trả lời</button>
+                    </div>
                 </div>
             </div>
+            <div id="replyInput-${comment.id}" class="reply-input comment-input">
+                <input type="text" maxlength="200">
+                <button onclick="postReply('${photoId}', '${comment.id}', '${comment.userId}', '${comment.userName}')">Gửi</button>
+            </div>
+            ${replies.length > 0 ? `
+                <div class="comment-replies">
+                    ${replies.map(reply => {
+            const replyAvatarHTML = reply.userAvatarImage
+                ? `<img src="${reply.userAvatarImage}" alt="Avatar">`
+                : (reply.userAvatar || '👤');
+            return `
+                            <div class="comment-item reply-item">
+                                <div class="comment-avatar" onclick="viewUserProfile('${reply.userId}')">${replyAvatarHTML}</div>
+                                <div class="comment-content">
+                                    <div class="comment-author">
+                                        ${reply.userName}
+                                        <span class="replying-to">→ @${reply.replyToUser}</span>
+                                    </div>
+                                    <div class="comment-text">${reply.comment}</div>
+                                    <div class="comment-time">${formatTimestamp(reply.createdAt)}</div>
+                                </div>
+                            </div>
+                        `;
+        }).join('')}
+                </div>
+            ` : ''}
         `;
     }).join('');
 }
