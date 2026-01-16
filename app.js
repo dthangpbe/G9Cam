@@ -159,6 +159,30 @@ function setupEventListeners() {
         btn.addEventListener('click', (e) => switchTab(e.target.dataset.tab));
     });
 
+    // Albums
+    document.getElementById('albumsBtn').addEventListener('click', () => {
+        renderAlbums();
+        openModal(elements.albumsModal);
+    });
+
+    document.getElementById('createAlbumBtn').addEventListener('click', () => {
+        document.getElementById('albumName').value = '';
+        document.getElementById('albumDescription').value = '';
+        openModal(elements.createAlbumModal);
+    });
+
+    document.getElementById('saveAlbumBtn').addEventListener('click', async () => {
+        const name = document.getElementById('albumName').value.trim();
+        if (!name) {
+            alert('Vui lòng nhập tên album!');
+            return;
+        }
+        const description = document.getElementById('albumDescription').value.trim();
+        await createAlbum(name, description);
+        closeModal(elements.createAlbumModal);
+        renderAlbums();
+    });
+
     // Reactions
     document.querySelectorAll('.reaction-btn').forEach(btn => {
         btn.addEventListener('click', (e) => addReaction(e.target.dataset.reaction));
@@ -1620,3 +1644,197 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
     init();
 });
+
+// ===== ALBUMS FUNCTIONS =====
+
+// Create new album
+async function createAlbum(name, description) {
+    try {
+        const albumRef = await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums').add({
+                name,
+                description: description || '',
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                photoCount: 0,
+                coverPhotoUrl: null
+            });
+        console.log('Album created:', albumRef.id);
+        return albumRef.id;
+    } catch (error) {
+        console.error('Error creating album:', error);
+        alert('Không thể tạo album. Vui lòng thử lại!');
+    }
+}
+
+// Render albums list
+async function renderAlbums() {
+    try {
+        const albumsSnapshot = await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .orderBy('createdAt', 'desc')
+            .get();
+
+        const albumsList = document.getElementById('albumsList');
+
+        if (albumsSnapshot.empty) {
+            albumsList.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Chưa có album nào. Tạo album đầu tiên!</p>';
+            return;
+        }
+
+        const albumsHTML = albumsSnapshot.docs.map(doc => {
+            const album = doc.data();
+            const coverImg = album.coverPhotoUrl
+                ? `<img src="${album.coverPhotoUrl}" style="width: 100%; height: 100%; object-fit: cover;">`
+                : '📁';
+
+            return `
+                <div class="album-card" onclick="openAlbum('${doc.id}', '${album.name.replace(/'/g, "\\'")}', ${album.photoCount})">
+                    <div class="album-cover">${coverImg}</div>
+                    <h3 class="album-name">${album.name}</h3>
+                    <p class="album-photo-count">${album.photoCount} ảnh</p>
+                    ${album.description ? `<p class="album-desc">${album.description}</p>` : ''}
+                </div>
+            `;
+        }).join('');
+
+        albumsList.innerHTML = albumsHTML;
+    } catch (error) {
+        console.error('Error rendering albums:', error);
+    }
+}
+
+// Open album detail
+async function openAlbum(albumId, albumName, photoCount) {
+    try {
+        // Set album info
+        document.getElementById('albumDetailTitle').textContent = albumName;
+
+        // Get album details for description
+        const albumDoc = await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .doc(albumId)
+            .get();
+
+        const albumData = albumDoc.data();
+        document.getElementById('albumDetailDesc').textContent =
+            albumData.description || `${photoCount} ảnh`;
+
+        // Fetch photos in this album
+        const albumPhotosSnapshot = await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .doc(albumId)
+            .collection('photos')
+            .orderBy('addedAt', 'desc')
+            .get();
+
+        const albumPhotosGrid = document.getElementById('albumPhotosGrid');
+
+        if (albumPhotosSnapshot.empty) {
+            albumPhotosGrid.innerHTML = '<p style="text-align: center; color: var(--text-secondary); padding: 2rem;">Album trống. Thêm ảnh vào album khi đăng ảnh mới!</p>';
+        } else {
+            // Fetch actual photo data
+            const photoIds = albumPhotosSnapshot.docs.map(doc => doc.data().photoRef.id);
+            const photosPromises = photoIds.map(photoId =>
+                db.collection('photos').doc(photoId).get()
+            );
+
+            const photosDocs = await Promise.all(photosPromises);
+
+            const photosHTML = photosDocs
+                .filter(doc => doc.exists)
+                .map(doc => {
+                    const photo = doc.data();
+                    return `
+                        <div class="album-photo-item">
+                            <img src="${photo.image}" alt="Photo">
+                            <button class="remove-from-album-btn" 
+                                onclick="removePhotoFromAlbum('${albumId}', '${doc.id}', event)">
+                                🗑️
+                            </button>
+                        </div>
+                    `;
+                }).join('');
+
+            albumPhotosGrid.innerHTML = photosHTML;
+        }
+
+        openModal(elements.albumDetailModal);
+    } catch (error) {
+        console.error('Error opening album:', error);
+    }
+}
+
+// Remove photo from album
+async function removePhotoFromAlbum(albumId, photoId, event) {
+    event.stopPropagation();
+
+    if (!confirm('Xóa ảnh khỏi album này?')) return;
+
+    try {
+        await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .doc(albumId)
+            .collection('photos')
+            .doc(photoId).delete();
+
+        // Update photo count
+        await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .doc(albumId).update({
+                photoCount: firebase.firestore.FieldValue.increment(-1)
+            });
+
+        // Refresh album view
+        const albumDoc = await db.collection('users').doc(APP_STATE.currentUser.uid)
+            .collection('albums').doc(albumId).get();
+        const albumData = albumDoc.data();
+
+        openAlbum(albumId, albumData.name, albumData.photoCount);
+        renderAlbums(); // Update albums list
+    } catch (error) {
+        console.error('Error removing photo from album:', error);
+        alert('Không thể xóa ảnh. Vui lòng thử lại!');
+    }
+}
+
+// Add photo to album (called during photo upload)
+async function addPhotoToAlbum(photoId, albumId) {
+    try {
+        await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .doc(albumId)
+            .collection('photos')
+            .doc(photoId).set({
+                photoRef: db.collection('photos').doc(photoId),
+                addedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+        // Update photo count and cover photo if first photo
+        const albumRef = db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .doc(albumId);
+
+        const albumDoc = await albumRef.get();
+        const updates = {
+            photoCount: firebase.firestore.FieldValue.increment(1)
+        };
+
+        // Set cover photo if this is first photo
+        if (!albumDoc.data().coverPhotoUrl) {
+            const photoDoc = await db.collection('photos').doc(photoId).get();
+            updates.coverPhotoUrl = photoDoc.data().image;
+        }
+
+        await albumRef.update(updates);
+    } catch (error) {
+        console.error('Error adding photo to album:', error);
+    }
+}
