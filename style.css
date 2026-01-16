@@ -2152,3 +2152,28 @@ body {
         min-width: 55px !important;
     }
 }
+/* ===== COMMENT INPUT CONTAINER FIX ===== */
+.comment-input,
+.reply-input {
+    overflow: visible !important;
+    border-radius: 2rem !important;
+}
+
+.comment-input input,
+.reply-input input {
+    border-radius: 2rem !important;
+}
+
+/* Force button visibility */
+.comment-input button,
+.reply-input button {
+    overflow: visible !important;
+    clip-path: none !important;
+    -webkit-clip-path: none !important;
+}
+
+/* Ensure parent containers don't clip */
+.comments-section,
+.photo-card-content {
+    overflow: visible !important;
+}
