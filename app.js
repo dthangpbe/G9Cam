@@ -963,6 +963,7 @@ function openReactionModal(photoId) {
     openModal(elements.reactionsModal);
 }
 
+
 async function addReaction(emoji) {
     if (!APP_STATE.currentReactionPhotoId) return;
 
@@ -970,375 +971,369 @@ async function addReaction(emoji) {
         const photoRef = db.collection('photos').doc(APP_STATE.currentReactionPhotoId);
         const reactionsRef = photoRef.collection('reactions');
 
-        // Check if user already reacted with this emoji
-        async function addReaction(photoId, emoji) {
-            try {
-                const reactionsRef = db.collection('photos').doc(photoId).collection('reactions');
+        // Check if user already has a reaction (any emoji)
+        const existingReaction = await reactionsRef
+            .where('userId', '==', APP_STATE.currentUser.uid)
+            .get();
 
-                // Check if user already has a reaction
-                const existingReaction = await reactionsRef
-                    .where('userId', '==', APP_STATE.currentUser.uid)
-                    .get();
+        // Remove existing reaction if found
+        if (!existingReaction.empty) {
+            await existingReaction.docs[0].ref.delete();
+        }
 
-                // Remove existing reaction if found
-                if (!existingReaction.empty) {
-                    await existingReaction.docs[0].ref.delete();
+        // Add new reaction
+        await reactionsRef.add({
+            userId: APP_STATE.currentUser.uid,
+            userName: APP_STATE.currentUser.displayName,
+            emoji: emoji,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        closeModal(elements.reactionsModal);
+    } catch (error) {
+        console.error('Add reaction error:', error);
+    }
+}
+
+// ===== Modal Functions =====
+function openModal(modal) {
+    modal.classList.add('active');
+}
+
+function closeModal(modal) {
+    modal.classList.remove('active');
+}
+
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.tab === tabName) {
+            btn.classList.add('active');
+        }
+    });
+
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+
+    const targetContent = tabName === 'myFriends'
+        ? document.getElementById('myFriendsTab')
+        : document.getElementById('suggestedTab');
+    targetContent.classList.add('active');
+
+    if (tabName === 'suggested') {
+        renderSuggestedFriends();
+    }
+}
+
+// ===== Profile Functions =====
+let pendingAvatarData = null;
+
+async function openProfileModal() {
+    // Load current user data
+    const userDoc = await db.collection('users').doc(APP_STATE.currentUser.uid).get();
+    const userData = userDoc.data();
+
+    // Update profile view
+    elements.profileDisplayName.textContent = userData.displayName || userData.username;
+    elements.profileAccountId.textContent = userData.accountId;
+
+    // Display avatar
+    if (userData.avatarImage) {
+        elements.profileAvatarImg.src = userData.avatarImage;
+        elements.profileAvatarImg.style.display = 'block';
+        elements.profileAvatarEmoji.style.display = 'none';
+    } else {
+        elements.profileAvatarEmoji.textContent = userData.avatar || '👤';
+        elements.profileAvatarImg.style.display = 'none';
+        elements.profileAvatarEmoji.style.display = 'block';
+    }
+
+    // Display bio
+    elements.profileBioText.textContent = userData.bio || 'Chưa có tiểu sử';
+
+    // Get friend count
+    const friendsSnapshot = await db.collection('users').doc(APP_STATE.currentUser.uid)
+        .collection('friends').get();
+    elements.profileFriendCount.textContent = friendsSnapshot.size;
+
+    // Show modal
+    openModal(elements.profileModal);
+}
+
+async function viewUserProfile(userId) {
+    if (!userId) return;
+
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            alert('Không tìm thấy người dùng!');
+            return;
+        }
+
+        const userData = userDoc.data();
+
+        elements.profileDisplayName.textContent = userData.displayName || userData.username;
+        elements.profileAccountId.textContent = userData.accountId;
+
+        if (userData.avatarImage) {
+            elements.profileAvatarImg.src = userData.avatarImage;
+            elements.profileAvatarImg.style.display = 'block';
+            elements.profileAvatarEmoji.style.display = 'none';
+        } else {
+            elements.profileAvatarEmoji.textContent = userData.avatar || '👤';
+            elements.profileAvatarImg.style.display = 'none';
+            elements.profileAvatarEmoji.style.display = 'block';
+        }
+
+        elements.profileBioText.textContent = userData.bio || 'Chưa có tiểu sử';
+
+        const friendsSnapshot = await db.collection('users').doc(userId)
+            .collection('friends').get();
+        elements.profileFriendCount.textContent = friendsSnapshot.size;
+
+        // Hide edit button if viewing someone else's profile
+        if (userId === APP_STATE.currentUser.uid) {
+            elements.editProfileBtn.style.display = 'block';
+        } else {
+            elements.editProfileBtn.style.display = 'none';
+        }
+
+        openModal(elements.profileModal);
+
+    } catch (error) {
+        console.error('View profile error:', error);
+        alert('Lỗi khi xem profile: ' + error.message);
+    }
+}
+
+function switchToEditMode() {
+    elements.profileView.style.display = 'none';
+    elements.profileEdit.style.display = 'block';
+
+    // Load current values
+    elements.editDisplayName.value = APP_STATE.currentUser.displayName || '';
+    elements.editBio.value = APP_STATE.currentUser.bio || '';
+    updateBioCharCount();
+
+    // Set avatar preview
+    if (APP_STATE.currentUser.avatarImage) {
+        elements.avatarPreviewImg.src = APP_STATE.currentUser.avatarImage;
+        elements.avatarPreviewImg.style.display = 'block';
+        elements.avatarPreviewEmoji.style.display = 'none';
+        elements.removeAvatarBtn.style.display = 'inline-block';
+    } else {
+        elements.avatarPreviewEmoji.textContent = APP_STATE.currentUser.avatar || '👤';
+        elements.avatarPreviewImg.style.display = 'none';
+        elements.avatarPreviewEmoji.style.display = 'block';
+        elements.removeAvatarBtn.style.display = 'none';
+    }
+}
+
+function cancelEdit() {
+    elements.profileEdit.style.display = 'none';
+    elements.profileView.style.display = 'block';
+    pendingAvatarData = null;
+}
+
+function handleAvatarUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+        alert('Vui lòng chọn file ảnh!');
+        return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+        alert('Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+            // Compress and resize to 200x200
+            const canvas = document.createElement('canvas');
+            const maxSize = 200;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+                if (width > maxSize) {
+                    height = (height / width) * maxSize;
+                    width = maxSize;
                 }
-
-                // Add new reaction
-                await reactionsRef.add({
-                    emoji: emoji,
-                    userId: APP_STATE.currentUser.uid,
-                    userName: APP_STATE.currentUser.displayName,
-                    userAvatar: APP_STATE.currentUser.avatarImage || APP_STATE.currentUser.avatar,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                closeModal(elements.reactionsModal);
-            } catch (error) {
-                console.error('Add reaction error:', error);
-            }
-        }
-
-        // ===== Modal Functions =====
-        function openModal(modal) {
-            modal.classList.add('active');
-        }
-
-        function closeModal(modal) {
-            modal.classList.remove('active');
-        }
-
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if (btn.dataset.tab === tabName) {
-                    btn.classList.add('active');
-                }
-            });
-
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.classList.remove('active');
-            });
-
-            const targetContent = tabName === 'myFriends'
-                ? document.getElementById('myFriendsTab')
-                : document.getElementById('suggestedTab');
-            targetContent.classList.add('active');
-
-            if (tabName === 'suggested') {
-                renderSuggestedFriends();
-            }
-        }
-
-        // ===== Profile Functions =====
-        let pendingAvatarData = null;
-
-        async function openProfileModal() {
-            // Load current user data
-            const userDoc = await db.collection('users').doc(APP_STATE.currentUser.uid).get();
-            const userData = userDoc.data();
-
-            // Update profile view
-            elements.profileDisplayName.textContent = userData.displayName || userData.username;
-            elements.profileAccountId.textContent = userData.accountId;
-
-            // Display avatar
-            if (userData.avatarImage) {
-                elements.profileAvatarImg.src = userData.avatarImage;
-                elements.profileAvatarImg.style.display = 'block';
-                elements.profileAvatarEmoji.style.display = 'none';
             } else {
-                elements.profileAvatarEmoji.textContent = userData.avatar || '👤';
-                elements.profileAvatarImg.style.display = 'none';
-                elements.profileAvatarEmoji.style.display = 'block';
-            }
-
-            // Display bio
-            elements.profileBioText.textContent = userData.bio || 'Chưa có tiểu sử';
-
-            // Get friend count
-            const friendsSnapshot = await db.collection('users').doc(APP_STATE.currentUser.uid)
-                .collection('friends').get();
-            elements.profileFriendCount.textContent = friendsSnapshot.size;
-
-            // Show modal
-            openModal(elements.profileModal);
-        }
-
-        async function viewUserProfile(userId) {
-            if (!userId) return;
-
-            try {
-                const userDoc = await db.collection('users').doc(userId).get();
-                if (!userDoc.exists) {
-                    alert('Không tìm thấy người dùng!');
-                    return;
+                if (height > maxSize) {
+                    width = (width / height) * maxSize;
+                    height = maxSize;
                 }
-
-                const userData = userDoc.data();
-
-                elements.profileDisplayName.textContent = userData.displayName || userData.username;
-                elements.profileAccountId.textContent = userData.accountId;
-
-                if (userData.avatarImage) {
-                    elements.profileAvatarImg.src = userData.avatarImage;
-                    elements.profileAvatarImg.style.display = 'block';
-                    elements.profileAvatarEmoji.style.display = 'none';
-                } else {
-                    elements.profileAvatarEmoji.textContent = userData.avatar || '👤';
-                    elements.profileAvatarImg.style.display = 'none';
-                    elements.profileAvatarEmoji.style.display = 'block';
-                }
-
-                elements.profileBioText.textContent = userData.bio || 'Chưa có tiểu sử';
-
-                const friendsSnapshot = await db.collection('users').doc(userId)
-                    .collection('friends').get();
-                elements.profileFriendCount.textContent = friendsSnapshot.size;
-
-                // Hide edit button if viewing someone else's profile
-                if (userId === APP_STATE.currentUser.uid) {
-                    elements.editProfileBtn.style.display = 'block';
-                } else {
-                    elements.editProfileBtn.style.display = 'none';
-                }
-
-                openModal(elements.profileModal);
-
-            } catch (error) {
-                console.error('View profile error:', error);
-                alert('Lỗi khi xem profile: ' + error.message);
             }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+            pendingAvatarData = compressedData;
+
+            elements.avatarPreviewImg.src = compressedData;
+            elements.avatarPreviewImg.style.display = 'block';
+            elements.avatarPreviewEmoji.style.display = 'none';
+            elements.removeAvatarBtn.style.display = 'inline-block';
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeAvatar() {
+    pendingAvatarData = 'removed';
+    elements.avatarPreviewImg.style.display = 'none';
+    elements.avatarPreviewEmoji.style.display = 'block';
+    elements.avatarPreviewEmoji.textContent = getRandomAvatar();
+    elements.removeAvatarBtn.style.display = 'none';
+}
+
+function updateBioCharCount() {
+    const length = elements.editBio.value.length;
+    elements.bioCharCount.textContent = `${length}/150`;
+}
+
+async function saveProfile() {
+    const newDisplayName = elements.editDisplayName.value.trim();
+    const newBio = elements.editBio.value.trim();
+
+    if (!newDisplayName) {
+        alert('Vui lòng nhập tên hiển thị!');
+        return;
+    }
+
+    if (newDisplayName.length > 30) {
+        alert('Tên hiển thị quá dài (tối đa 30 ký tự)!');
+        return;
+    }
+
+    if (newBio.length > 150) {
+        alert('Tiểu sử quá dài (tối đa 150 ký tự)!');
+        return;
+    }
+
+    try {
+        const updateData = {
+            displayName: newDisplayName,
+            bio: newBio
+        };
+
+        if (pendingAvatarData === 'removed') {
+            updateData.avatarImage = firebase.firestore.FieldValue.delete();
+            updateData.avatar = getRandomAvatar();
+        } else if (pendingAvatarData) {
+            updateData.avatarImage = pendingAvatarData;
         }
 
-        function switchToEditMode() {
-            elements.profileView.style.display = 'none';
-            elements.profileEdit.style.display = 'block';
+        await db.collection('users').doc(APP_STATE.currentUser.uid).update(updateData);
 
-            // Load current values
-            elements.editDisplayName.value = APP_STATE.currentUser.displayName || '';
-            elements.editBio.value = APP_STATE.currentUser.bio || '';
-            updateBioCharCount();
-
-            // Set avatar preview
-            if (APP_STATE.currentUser.avatarImage) {
-                elements.avatarPreviewImg.src = APP_STATE.currentUser.avatarImage;
-                elements.avatarPreviewImg.style.display = 'block';
-                elements.avatarPreviewEmoji.style.display = 'none';
-                elements.removeAvatarBtn.style.display = 'inline-block';
-            } else {
-                elements.avatarPreviewEmoji.textContent = APP_STATE.currentUser.avatar || '👤';
-                elements.avatarPreviewImg.style.display = 'none';
-                elements.avatarPreviewEmoji.style.display = 'block';
-                elements.removeAvatarBtn.style.display = 'none';
-            }
+        APP_STATE.currentUser.displayName = newDisplayName;
+        APP_STATE.currentUser.bio = newBio;
+        if (pendingAvatarData === 'removed') {
+            delete APP_STATE.currentUser.avatarImage;
+            APP_STATE.currentUser.avatar = updateData.avatar;
+        } else if (pendingAvatarData) {
+            APP_STATE.currentUser.avatarImage = pendingAvatarData;
         }
 
-        function cancelEdit() {
-            elements.profileEdit.style.display = 'none';
-            elements.profileView.style.display = 'block';
-            pendingAvatarData = null;
-        }
+        pendingAvatarData = null;
+        await openProfileModal();
+        cancelEdit();
 
-        function handleAvatarUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
+    } catch (error) {
+        console.error('Save profile error:', error);
+        alert('Lỗi khi lưu profile: ' + error.message);
+    }
+}
 
-            if (!file.type.startsWith('image/')) {
-                alert('Vui lòng chọn file ảnh!');
-                return;
-            }
+// ===== Comments Functions =====
+async function postComment(photoId) {
+    const input = document.getElementById(`commentInput-${photoId}`);
+    const commentText = input.value.trim();
 
-            if (file.size > 5 * 1024 * 1024) {
-                alert('Ảnh quá lớn! Vui lòng chọn ảnh nhỏ hơn 5MB.');
-                return;
-            }
+    if (!commentText) {
+        alert('Vui lòng nhập bình luận!');
+        return;
+    }
 
-            const reader = new FileReader();
-            reader.onload = (e) => {
-                const img = new Image();
-                img.onload = () => {
-                    // Compress and resize to 200x200
-                    const canvas = document.createElement('canvas');
-                    const maxSize = 200;
-                    let width = img.width;
-                    let height = img.height;
+    if (commentText.length > 200) {
+        alert('Bình luận quá dài (tối đa 200 ký tự)!');
+        return;
+    }
 
-                    if (width > height) {
-                        if (width > maxSize) {
-                            height = (height / width) * maxSize;
-                            width = maxSize;
-                        }
-                    } else {
-                        if (height > maxSize) {
-                            width = (width / height) * maxSize;
-                            height = maxSize;
-                        }
-                    }
-
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-
-                    const compressedData = canvas.toDataURL('image/jpeg', 0.8);
-                    pendingAvatarData = compressedData;
-
-                    elements.avatarPreviewImg.src = compressedData;
-                    elements.avatarPreviewImg.style.display = 'block';
-                    elements.avatarPreviewEmoji.style.display = 'none';
-                    elements.removeAvatarBtn.style.display = 'inline-block';
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function removeAvatar() {
-            pendingAvatarData = 'removed';
-            elements.avatarPreviewImg.style.display = 'none';
-            elements.avatarPreviewEmoji.style.display = 'block';
-            elements.avatarPreviewEmoji.textContent = getRandomAvatar();
-            elements.removeAvatarBtn.style.display = 'none';
-        }
-
-        function updateBioCharCount() {
-            const length = elements.editBio.value.length;
-            elements.bioCharCount.textContent = `${length}/150`;
-        }
-
-        async function saveProfile() {
-            const newDisplayName = elements.editDisplayName.value.trim();
-            const newBio = elements.editBio.value.trim();
-
-            if (!newDisplayName) {
-                alert('Vui lòng nhập tên hiển thị!');
-                return;
-            }
-
-            if (newDisplayName.length > 30) {
-                alert('Tên hiển thị quá dài (tối đa 30 ký tự)!');
-                return;
-            }
-
-            if (newBio.length > 150) {
-                alert('Tiểu sử quá dài (tối đa 150 ký tự)!');
-                return;
-            }
-
-            try {
-                const updateData = {
-                    displayName: newDisplayName,
-                    bio: newBio
-                };
-
-                if (pendingAvatarData === 'removed') {
-                    updateData.avatarImage = firebase.firestore.FieldValue.delete();
-                    updateData.avatar = getRandomAvatar();
-                } else if (pendingAvatarData) {
-                    updateData.avatarImage = pendingAvatarData;
-                }
-
-                await db.collection('users').doc(APP_STATE.currentUser.uid).update(updateData);
-
-                APP_STATE.currentUser.displayName = newDisplayName;
-                APP_STATE.currentUser.bio = newBio;
-                if (pendingAvatarData === 'removed') {
-                    delete APP_STATE.currentUser.avatarImage;
-                    APP_STATE.currentUser.avatar = updateData.avatar;
-                } else if (pendingAvatarData) {
-                    APP_STATE.currentUser.avatarImage = pendingAvatarData;
-                }
-
-                pendingAvatarData = null;
-                await openProfileModal();
-                cancelEdit();
-
-            } catch (error) {
-                console.error('Save profile error:', error);
-                alert('Lỗi khi lưu profile: ' + error.message);
-            }
-        }
-
-        // ===== Comments Functions =====
-        async function postComment(photoId) {
-            const input = document.getElementById(`commentInput-${photoId}`);
-            const commentText = input.value.trim();
-
-            if (!commentText) {
-                alert('Vui lòng nhập bình luận!');
-                return;
-            }
-
-            if (commentText.length > 200) {
-                alert('Bình luận quá dài (tối đa 200 ký tự)!');
-                return;
-            }
-
-            try {
-                await db.collection('photos').doc(photoId)
-                    .collection('comments').add({
-                        userId: APP_STATE.currentUser.uid,
-                        userName: APP_STATE.currentUser.displayName || APP_STATE.currentUser.username,
-                        userAvatar: APP_STATE.currentUser.avatar,
-                        userAvatarImage: APP_STATE.currentUser.avatarImage,
-                        comment: commentText,
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-
-                input.value = '';
-
-                // Send notification to photo owner
-                const photoDoc = await db.collection('photos').doc(photoId).get();
-                if (photoDoc.exists) {
-                    await createNotification(photoDoc.data().userId, 'comment', {
-                        photoId: photoId,
-                        message: 'đã bình luận ảnh của bạn'
-                    });
-                }
-            } catch (error) {
-                console.error('Post comment error:', error);
-                alert('Lỗi khi đăng bình luận: ' + error.message);
-            }
-        }
-
-        function setupCommentsListener(photoId) {
-            const commentsRef = db.collection('photos').doc(photoId)
-                .collection('comments')
-                .orderBy('createdAt', 'asc');
-
-            const unsubscribe = commentsRef.onSnapshot((snapshot) => {
-                renderComments(photoId, snapshot);
+    try {
+        await db.collection('photos').doc(photoId)
+            .collection('comments').add({
+                userId: APP_STATE.currentUser.uid,
+                userName: APP_STATE.currentUser.displayName || APP_STATE.currentUser.username,
+                userAvatar: APP_STATE.currentUser.avatar,
+                userAvatarImage: APP_STATE.currentUser.avatarImage,
+                comment: commentText,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            APP_STATE.unsubscribers.push(unsubscribe);
+        input.value = '';
+
+        // Send notification to photo owner
+        const photoDoc = await db.collection('photos').doc(photoId).get();
+        if (photoDoc.exists) {
+            await createNotification(photoDoc.data().userId, 'comment', {
+                photoId: photoId,
+                message: 'đã bình luận ảnh của bạn'
+            });
         }
+    } catch (error) {
+        console.error('Post comment error:', error);
+        alert('Lỗi khi đăng bình luận: ' + error.message);
+    }
+}
 
-        function renderComments(photoId, snapshot) {
-            const container = document.getElementById(`commentsContainer-${photoId}`);
-            const countElement = document.getElementById(`commentCount-${photoId}`);
+function setupCommentsListener(photoId) {
+    const commentsRef = db.collection('photos').doc(photoId)
+        .collection('comments')
+        .orderBy('createdAt', 'asc');
 
-            if (!container || !countElement) return;
+    const unsubscribe = commentsRef.onSnapshot((snapshot) => {
+        renderComments(photoId, snapshot);
+    });
 
-            if (!snapshot || snapshot.empty) {
-                container.innerHTML = '';
-                countElement.textContent = '';
-                return;
-            }
+    APP_STATE.unsubscribers.push(unsubscribe);
+}
 
-            const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            const parentComments = comments.filter(c => !c.replyTo);
+function renderComments(photoId, snapshot) {
+    const container = document.getElementById(`commentsContainer-${photoId}`);
+    const countElement = document.getElementById(`commentCount-${photoId}`);
 
-            countElement.textContent = `${comments.length} bình luận`;
+    if (!container || !countElement) return;
 
-            container.innerHTML = parentComments.map(comment => {
-                const replies = comments.filter(c => c.replyTo === comment.id);
-                const avatarHTML = comment.userAvatarImage
-                    ? `<img src="${comment.userAvatarImage}" alt="Avatar">`
-                    : (comment.userAvatar || '👤');
+    if (!snapshot || snapshot.empty) {
+        container.innerHTML = '';
+        countElement.textContent = '';
+        return;
+    }
 
-                return `
+    const comments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const parentComments = comments.filter(c => !c.replyTo);
+
+    countElement.textContent = `${comments.length} bình luận`;
+
+    container.innerHTML = parentComments.map(comment => {
+        const replies = comments.filter(c => c.replyTo === comment.id);
+        const avatarHTML = comment.userAvatarImage
+            ? `<img src="${comment.userAvatarImage}" alt="Avatar">`
+            : (comment.userAvatar || '👤');
+
+        return `
             <div class="comment-item">
                 <div class="comment-avatar" onclick="viewUserProfile('${comment.userId}')">${avatarHTML}</div>
                 <div class="comment-content">
@@ -1358,10 +1353,10 @@ async function addReaction(emoji) {
             ${replies.length > 0 ? `
                 <div class="comment-replies">
                     ${replies.map(reply => {
-                    const replyAvatarHTML = reply.userAvatarImage
-                        ? `<img src="${reply.userAvatarImage}" alt="Avatar">`
-                        : (reply.userAvatar || '👤');
-                    return `
+            const replyAvatarHTML = reply.userAvatarImage
+                ? `<img src="${reply.userAvatarImage}" alt="Avatar">`
+                : (reply.userAvatar || '👤');
+            return `
                             <div class="comment-item reply-item">
                                 <div class="comment-avatar" onclick="viewUserProfile('${reply.userId}')">${replyAvatarHTML}</div>
                                 <div class="comment-content">
@@ -1375,86 +1370,86 @@ async function addReaction(emoji) {
                                 </div>
                             </div>
                         `;
-                }).join('')}
+        }).join('')}
                 </div>
             ` : ''}
         `;
-            }).join('');
+    }).join('');
+}
+
+// ===== Delete Photo Function =====
+async function deletePhoto(photoId) {
+    if (!confirm('Bạn có chắc muốn xóa ảnh này? Hành động này không thể hoàn tác.')) {
+        return;
+    }
+
+    try {
+        await db.collection('photos').doc(photoId).delete();
+        // Feed will auto-update via listener
+    } catch (error) {
+        console.error('Delete photo error:', error);
+        alert('Lỗi khi xóa ảnh: ' + error.message);
+    }
+}
+
+// ===== Notifications System =====
+async function createNotification(toUserId, type, data) {
+    if (toUserId === APP_STATE.currentUser.uid) return;
+
+    const notification = {
+        type: type,
+        fromUserId: APP_STATE.currentUser.uid,
+        fromUserName: APP_STATE.currentUser.displayName || APP_STATE.currentUser.username,
+        fromUserAvatar: APP_STATE.currentUser.avatar,
+        fromUserAvatarImage: APP_STATE.currentUser.avatarImage,
+        read: false,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        ...data
+    };
+
+    try {
+        await db.collection('users').doc(toUserId).collection('notifications').add(notification);
+    } catch (error) {
+        console.error('Create notification error:', error);
+    }
+}
+
+function setupNotificationsListener() {
+    const notifsRef = db.collection('users').doc(APP_STATE.currentUser.uid)
+        .collection('notifications')
+        .orderBy('createdAt', 'desc')
+        .limit(50);
+
+    const unsubscribe = notifsRef.onSnapshot((snapshot) => {
+        const unreadCount = snapshot.docs.filter(d => !d.data().read).length;
+
+        if (unreadCount > 0) {
+            elements.notifBadge.textContent = unreadCount;
+            elements.notifBadge.style.display = 'block';
+        } else {
+            elements.notifBadge.style.display = 'none';
         }
 
-        // ===== Delete Photo Function =====
-        async function deletePhoto(photoId) {
-            if (!confirm('Bạn có chắc muốn xóa ảnh này? Hành động này không thể hoàn tác.')) {
-                return;
-            }
+        renderNotifications(snapshot);
+    });
 
-            try {
-                await db.collection('photos').doc(photoId).delete();
-                // Feed will auto-update via listener
-            } catch (error) {
-                console.error('Delete photo error:', error);
-                alert('Lỗi khi xóa ảnh: ' + error.message);
-            }
-        }
+    APP_STATE.unsubscribers.push(unsubscribe);
+}
 
-        // ===== Notifications System =====
-        async function createNotification(toUserId, type, data) {
-            if (toUserId === APP_STATE.currentUser.uid) return;
+function renderNotifications(snapshot) {
+    if (!snapshot || snapshot.empty) {
+        elements.notificationsList.innerHTML = '<div class="empty-state"><p>Chưa có thông báo</p></div>';
+        return;
+    }
 
-            const notification = {
-                type: type,
-                fromUserId: APP_STATE.currentUser.uid,
-                fromUserName: APP_STATE.currentUser.displayName || APP_STATE.currentUser.username,
-                fromUserAvatar: APP_STATE.currentUser.avatar,
-                fromUserAvatarImage: APP_STATE.currentUser.avatarImage,
-                read: false,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                ...data
-            };
+    const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-            try {
-                await db.collection('users').doc(toUserId).collection('notifications').add(notification);
-            } catch (error) {
-                console.error('Create notification error:', error);
-            }
-        }
+    elements.notificationsList.innerHTML = notifications.map(notif => {
+        const avatarHTML = notif.fromUserAvatarImage
+            ? `<img src="${notif.fromUserAvatarImage}" alt="Avatar">`
+            : (notif.fromUserAvatar || '👤');
 
-        function setupNotificationsListener() {
-            const notifsRef = db.collection('users').doc(APP_STATE.currentUser.uid)
-                .collection('notifications')
-                .orderBy('createdAt', 'desc')
-                .limit(50);
-
-            const unsubscribe = notifsRef.onSnapshot((snapshot) => {
-                const unreadCount = snapshot.docs.filter(d => !d.data().read).length;
-
-                if (unreadCount > 0) {
-                    elements.notifBadge.textContent = unreadCount;
-                    elements.notifBadge.style.display = 'block';
-                } else {
-                    elements.notifBadge.style.display = 'none';
-                }
-
-                renderNotifications(snapshot);
-            });
-
-            APP_STATE.unsubscribers.push(unsubscribe);
-        }
-
-        function renderNotifications(snapshot) {
-            if (!snapshot || snapshot.empty) {
-                elements.notificationsList.innerHTML = '<div class="empty-state"><p>Chưa có thông báo</p></div>';
-                return;
-            }
-
-            const notifications = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-            elements.notificationsList.innerHTML = notifications.map(notif => {
-                const avatarHTML = notif.fromUserAvatarImage
-                    ? `<img src="${notif.fromUserAvatarImage}" alt="Avatar">`
-                    : (notif.fromUserAvatar || '👤');
-
-                return `
+        return `
             <div class="notification-item ${notif.read ? 'read' : 'unread'}" 
                  onclick="handleNotificationClick('${notif.id}', '${notif.photoId || ''}', '${notif.fromUserId}')">
                 <div class="notification-avatar">${avatarHTML}</div>
@@ -1466,161 +1461,161 @@ async function addReaction(emoji) {
                 <button class="notification-delete" onclick="event.stopPropagation(); deleteNotification('${notif.id}')">×</button>
             </div>
         `;
-            }).join('');
+    }).join('');
+}
+
+async function handleNotificationClick(notifId, photoId, fromUserId) {
+    try {
+        await db.collection('users').doc(APP_STATE.currentUser.uid)
+            .collection('notifications').doc(notifId).update({ read: true });
+
+        closeModal(elements.notificationsModal);
+
+        if (photoId && photoId !== 'undefined') {
+            document.getElementById(`photoCard-${photoId}`)?.scrollIntoView({ behavior: 'smooth' });
+        } else if (fromUserId) {
+            await viewUserProfile(fromUserId);
         }
+    } catch (error) {
+        console.error('Handle notification error:', error);
+    }
+}
 
-        async function handleNotificationClick(notifId, photoId, fromUserId) {
-            try {
-                await db.collection('users').doc(APP_STATE.currentUser.uid)
-                    .collection('notifications').doc(notifId).update({ read: true });
+async function deleteNotification(notifId) {
+    try {
+        await db.collection('users').doc(APP_STATE.currentUser.uid)
+            .collection('notifications').doc(notifId).delete();
+    } catch (error) {
+        console.error('Delete notification error:', error);
+    }
+}
 
-                closeModal(elements.notificationsModal);
+async function clearReadNotifications() {
+    try {
+        const snapshot = await db.collection('users').doc(APP_STATE.currentUser.uid)
+            .collection('notifications').where('read', '==', true).get();
 
-                if (photoId && photoId !== 'undefined') {
-                    document.getElementById(`photoCard-${photoId}`)?.scrollIntoView({ behavior: 'smooth' });
-                } else if (fromUserId) {
-                    await viewUserProfile(fromUserId);
-                }
-            } catch (error) {
-                console.error('Handle notification error:', error);
-            }
-        }
+        const batch = db.batch();
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+    } catch (error) {
+        console.error('Clear notifications error:', error);
+    }
+}
 
-        async function deleteNotification(notifId) {
-            try {
-                await db.collection('users').doc(APP_STATE.currentUser.uid)
-                    .collection('notifications').doc(notifId).delete();
-            } catch (error) {
-                console.error('Delete notification error:', error);
-            }
-        }
+// ===== Comment Replies =====
+function showReplyInput(photoId, commentId, userName) {
+    const replyInput = document.getElementById(`replyInput-${commentId}`);
+    if (replyInput) {
+        replyInput.classList.add('active');
+        const input = replyInput.querySelector('input');
+        input.placeholder = `Trả lời @${userName}...`;
+        input.focus();
+    }
+}
 
-        async function clearReadNotifications() {
-            try {
-                const snapshot = await db.collection('users').doc(APP_STATE.currentUser.uid)
-                    .collection('notifications').where('read', '==', true).get();
+async function postReply(photoId, parentCommentId, parentUserId, parentUserName) {
+    const input = document.getElementById(`replyInput-${parentCommentId}`).querySelector('input');
+    const replyText = input.value.trim();
 
-                const batch = db.batch();
-                snapshot.docs.forEach(doc => batch.delete(doc.ref));
-                await batch.commit();
-            } catch (error) {
-                console.error('Clear notifications error:', error);
-            }
-        }
+    if (!replyText) {
+        alert('Vui lòng nhập nội dung trả lời!');
+        return;
+    }
 
-        // ===== Comment Replies =====
-        function showReplyInput(photoId, commentId, userName) {
-            const replyInput = document.getElementById(`replyInput-${commentId}`);
-            if (replyInput) {
-                replyInput.classList.add('active');
-                const input = replyInput.querySelector('input');
-                input.placeholder = `Trả lời @${userName}...`;
-                input.focus();
-            }
-        }
-
-        async function postReply(photoId, parentCommentId, parentUserId, parentUserName) {
-            const input = document.getElementById(`replyInput-${parentCommentId}`).querySelector('input');
-            const replyText = input.value.trim();
-
-            if (!replyText) {
-                alert('Vui lòng nhập nội dung trả lời!');
-                return;
-            }
-
-            try {
-                await db.collection('photos').doc(photoId).collection('comments').add({
-                    userId: APP_STATE.currentUser.uid,
-                    userName: APP_STATE.currentUser.displayName || APP_STATE.currentUser.username,
-                    userAvatar: APP_STATE.currentUser.avatar,
-                    userAvatarImage: APP_STATE.currentUser.avatarImage,
-                    comment: replyText,
-                    replyTo: parentCommentId,
-                    replyToUser: parentUserName,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                input.value = '';
-                document.getElementById(`replyInput-${parentCommentId}`).classList.remove('active');
-
-                await createNotification(parentUserId, 'reply', {
-                    photoId: photoId,
-                    commentId: parentCommentId,
-                    message: 'đã trả lời bình luận của bạn'
-                });
-            } catch (error) {
-                console.error('Post reply error:', error);
-                alert('Lỗi khi đăng trả lời: ' + error.message);
-            }
-        }
-
-        // ===== UI Helper Functions =====
-        function updateHeaderAvatar() {
-            if (!APP_STATE.currentUser) return;
-
-            const avatarHTML = APP_STATE.currentUser.avatarImage
-                ? `<img src="${APP_STATE.currentUser.avatarImage}" alt="Avatar">`
-                : APP_STATE.currentUser.avatar || '👤';
-
-            elements.headerAvatar.innerHTML = avatarHTML;
-        }
-
-        async function deleteComment(photoId, commentId) {
-            if (!confirm('Bạn có chắc muốn xóa bình luận này?')) {
-                return;
-            }
-
-            try {
-                await db.collection('photos').doc(photoId)
-                    .collection('comments').doc(commentId).delete();
-            } catch (error) {
-                console.error('Delete comment error:', error);
-                alert('Lỗi khi xóa bình luận: ' + error.message);
-            }
-        }
-
-        // ===== Camera & Theme Functions =====
-        async function flipCamera() {
-            if (currentStream) {
-                currentStream.getTracks().forEach(track => track.stop());
-            }
-
-            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: currentFacingMode },
-                    audio: false
-                });
-                elements.cameraPreview.srcObject = stream;
-                currentStream = stream;
-            } catch (error) {
-                console.error('Camera flip error:', error);
-                alert('Không thể chuyển camera.');
-                currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-            }
-        }
-
-        function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-
-            document.documentElement.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-
-            elements.themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
-        }
-
-        function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.documentElement.setAttribute('data-theme', savedTheme);
-            if (elements.themeToggle) {
-                elements.themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
-            }
-        }
-
-        // ===== Start Application =====
-        document.addEventListener('DOMContentLoaded', () => {
-            initTheme();
-            init();
+    try {
+        await db.collection('photos').doc(photoId).collection('comments').add({
+            userId: APP_STATE.currentUser.uid,
+            userName: APP_STATE.currentUser.displayName || APP_STATE.currentUser.username,
+            userAvatar: APP_STATE.currentUser.avatar,
+            userAvatarImage: APP_STATE.currentUser.avatarImage,
+            comment: replyText,
+            replyTo: parentCommentId,
+            replyToUser: parentUserName,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+
+        input.value = '';
+        document.getElementById(`replyInput-${parentCommentId}`).classList.remove('active');
+
+        await createNotification(parentUserId, 'reply', {
+            photoId: photoId,
+            commentId: parentCommentId,
+            message: 'đã trả lời bình luận của bạn'
+        });
+    } catch (error) {
+        console.error('Post reply error:', error);
+        alert('Lỗi khi đăng trả lời: ' + error.message);
+    }
+}
+
+// ===== UI Helper Functions =====
+function updateHeaderAvatar() {
+    if (!APP_STATE.currentUser) return;
+
+    const avatarHTML = APP_STATE.currentUser.avatarImage
+        ? `<img src="${APP_STATE.currentUser.avatarImage}" alt="Avatar">`
+        : APP_STATE.currentUser.avatar || '👤';
+
+    elements.headerAvatar.innerHTML = avatarHTML;
+}
+
+async function deleteComment(photoId, commentId) {
+    if (!confirm('Bạn có chắc muốn xóa bình luận này?')) {
+        return;
+    }
+
+    try {
+        await db.collection('photos').doc(photoId)
+            .collection('comments').doc(commentId).delete();
+    } catch (error) {
+        console.error('Delete comment error:', error);
+        alert('Lỗi khi xóa bình luận: ' + error.message);
+    }
+}
+
+// ===== Camera & Theme Functions =====
+async function flipCamera() {
+    if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+    }
+
+    currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: currentFacingMode },
+            audio: false
+        });
+        elements.cameraPreview.srcObject = stream;
+        currentStream = stream;
+    } catch (error) {
+        console.error('Camera flip error:', error);
+        alert('Không thể chuyển camera.');
+        currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
+    }
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('theme', newTheme);
+
+    elements.themeToggle.textContent = newTheme === 'dark' ? '☀️' : '🌙';
+}
+
+function initTheme() {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    if (elements.themeToggle) {
+        elements.themeToggle.textContent = savedTheme === 'dark' ? '☀️' : '🌙';
+    }
+}
+
+// ===== Start Application =====
+document.addEventListener('DOMContentLoaded', () => {
+    initTheme();
+    init();
+});
