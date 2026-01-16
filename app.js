@@ -886,8 +886,8 @@ async function renderFeed(photoDocs) {
                         <button class="reaction-btn" onclick="openReactionModal('${photo.id}')">
                             😊
                         </button>
-                        ${reactionsDisplay}
                     </div>
+                    <div id="reactionsContainer-${photo.id}"></div>
                     
                     <!-- Comments Section -->
                     <div class="comments-section">
