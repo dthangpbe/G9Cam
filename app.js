@@ -85,7 +85,10 @@ const elements = {
     headerAvatar: document.getElementById('headerAvatar'),
     // Camera and theme controls
     flipCameraBtn: document.getElementById('flipCameraBtn'),
-    themeToggle: document.getElementById('themeToggle')
+    themeToggle: document.getElementById('themeToggle'),
+    albumsModal: document.getElementById('albumsModal'),
+    createAlbumModal: document.getElementById('createAlbumModal'),
+    albumDetailModal: document.getElementById('albumDetailModal')
 };
 
 // ===== Unique ID Generation =====
