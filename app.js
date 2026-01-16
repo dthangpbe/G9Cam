@@ -738,6 +738,9 @@ async function initCamera() {
         currentStream = await navigator.mediaDevices.getUserMedia(constraints);
         elements.cameraPreview.srcObject = currentStream;
         APP_STATE.stream = currentStream;
+
+        // Flip camera preview horizontally for front camera (natural selfie view)
+        elements.cameraPreview.style.transform = 'scaleX(-1)';
     } catch (error) {
         console.error('Camera error:', error);
         elements.cameraPreview.style.display = 'none';
@@ -773,6 +776,11 @@ function capturePhoto() {
 
     canvas.width = width;
     canvas.height = height;
+
+    // Flip canvas horizontally to correct mirrored preview
+    ctx.translate(width, 0);
+    ctx.scale(-1, 1);
+
     ctx.drawImage(video, 0, 0, width, height);
 
     // Lower quality to reduce size (0.7 instead of 0.9)
