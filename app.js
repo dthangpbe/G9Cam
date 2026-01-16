@@ -411,7 +411,7 @@ function setupFriendsListener() {
     APP_STATE.unsubscribers.push(unsubscribe);
 }
 
-function renderFriends(snapshot) {
+async function renderFriends(snapshot) {
     if (!snapshot || snapshot.empty) {
         elements.friendsList.innerHTML = `
             <div class="empty-state">
@@ -425,16 +425,45 @@ function renderFriends(snapshot) {
 
     const friends = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
-    elements.friendsList.innerHTML = friends.map(friend => `
-        <div class="friend-item">
-            <div class="friend-avatar">${friend.avatar}</div>
-            <div class="friend-info">
-                <h4>${friend.displayName}</h4>
-                <p>${friend.accountId}</p>
+    // Fetch latest user data for each friend
+    const friendDataPromises = friends.map(async (friend) => {
+        try {
+            const userDoc = await db.collection('users').doc(friend.friendUid).get();
+            if (userDoc.exists) {
+                const userData = userDoc.data();
+                return {
+                    ...friend,
+                    displayName: userData.displayName || friend.displayName,
+                    avatar: userData.avatar || friend.avatar,
+                    avatarImage: userData.avatarImage
+                };
+            }
+        } catch (error) {
+            console.warn('Could not fetch friend data:', error);
+        }
+        return friend;
+    });
+
+    const updatedFriends = await Promise.all(friendDataPromises);
+
+    elements.friendsList.innerHTML = updatedFriends.map(friend => {
+        const avatarHTML = friend.avatarImage
+            ? `<img src="${friend.avatarImage}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+            : friend.avatar;
+
+        return `
+            <div class="friend-item">
+                <div class="friend-avatar" onclick="viewUserProfile('${friend.friendUid}')" style="cursor: pointer;">
+                    ${avatarHTML}
+                </div>
+                <div class="friend-info">
+                    <h4>${friend.displayName}</h4>
+                    <p>${friend.accountId}</p>
+                </div>
+                <button class="friend-action remove" onclick="removeFriend('${friend.friendUid}')">Xóa</button>
             </div>
-            <button class="friend-action remove" onclick="removeFriend('${friend.friendUid}')">Xóa</button>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function updateFriendCount() {
@@ -776,7 +805,7 @@ function setupPhotosListener() {
     APP_STATE.unsubscribers.push(unsubscribe);
 }
 
-function renderFeed(photoDocs) {
+async function renderFeed(photoDocs) {
     if (!photoDocs || photoDocs.length === 0) {
         elements.photoFeed.innerHTML = `
             <div class="empty-state">
@@ -790,16 +819,41 @@ function renderFeed(photoDocs) {
 
     const photos = photoDocs.map(doc => ({ id: doc.id, ...doc.data() }));
 
+    // Fetch latest user data for each unique userId
+    const userDataCache = {};
+    await Promise.all(photos.map(async (photo) => {
+        if (photo.userId && !userDataCache[photo.userId]) {
+            try {
+                const userDoc = await db.collection('users').doc(photo.userId).get();
+                if (userDoc.exists) {
+                    userDataCache[photo.userId] = userDoc.data();
+                }
+            } catch (error) {
+                console.warn('Could not fetch user:', error);
+            }
+        }
+    }));
+
     elements.photoFeed.innerHTML = photos.map(photo => {
-        // Get reactions
-        const reactionsHTML = '';  // Will implement reactions next
+        // Get latest user data
+        const userData = userDataCache[photo.userId];
+        const userName = userData?.displayName || photo.userName || 'Unknown';
+        const userAvatar = userData?.avatar || photo.userAvatar || '👤';
+        const userAvatarImage = userData?.avatarImage;
+
+        // Render avatar (image or emoji)
+        const avatarHTML = userAvatarImage
+            ? `<img src="${userAvatarImage}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+            : `<span>${userAvatar}</span>`;
 
         return `
             <div class="photo-card">
                 <div class="photo-card-header">
-                    <div class="user-avatar">${photo.userAvatar}</div>
+                    <div class="user-avatar" onclick="viewUserProfile('${photo.userId}')" style="cursor: pointer;">
+                        ${avatarHTML}
+                    </div>
                     <div class="user-info">
-                        <h3>${photo.userName}</h3>
+                        <h3 onclick="viewUserProfile('${photo.userId}')" style="cursor: pointer;">${userName}</h3>
                         <p>${formatTimestamp(photo.timestamp || photo.createdAt)}</p>
                     </div>
                 </div>
@@ -819,7 +873,6 @@ function renderFeed(photoDocs) {
         `;
     }).join('');
 
-    // Setup reactions listeners for each photo
     photos.forEach(photo => {
         setupReactionsListener(photo.id);
     });
@@ -973,6 +1026,52 @@ async function openProfileModal() {
 
     // Show modal
     openModal(elements.profileModal);
+}
+
+async function viewUserProfile(userId) {
+    if (!userId) return;
+
+    try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            alert('Không tìm thấy người dùng!');
+            return;
+        }
+
+        const userData = userDoc.data();
+
+        elements.profileDisplayName.textContent = userData.displayName || userData.username;
+        elements.profileAccountId.textContent = userData.accountId;
+
+        if (userData.avatarImage) {
+            elements.profileAvatarImg.src = userData.avatarImage;
+            elements.profileAvatarImg.style.display = 'block';
+            elements.profileAvatarEmoji.style.display = 'none';
+        } else {
+            elements.profileAvatarEmoji.textContent = userData.avatar || '👤';
+            elements.profileAvatarImg.style.display = 'none';
+            elements.profileAvatarEmoji.style.display = 'block';
+        }
+
+        elements.profileBioText.textContent = userData.bio || 'Chưa có tiểu sử';
+
+        const friendsSnapshot = await db.collection('users').doc(userId)
+            .collection('friends').get();
+        elements.profileFriendCount.textContent = friendsSnapshot.size;
+
+        // Hide edit button if viewing someone else's profile
+        if (userId === APP_STATE.currentUser.uid) {
+            elements.editProfileBtn.style.display = 'block';
+        } else {
+            elements.editProfileBtn.style.display = 'none';
+        }
+
+        openModal(elements.profileModal);
+
+    } catch (error) {
+        console.error('View profile error:', error);
+        alert('Lỗi khi xem profile: ' + error.message);
+    }
 }
 
 function switchToEditMode() {
