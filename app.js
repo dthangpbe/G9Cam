@@ -808,7 +808,7 @@ async function postPhoto() {
     if (!APP_STATE.currentPhotoData) return;
 
     try {
-        await db.collection('photos').add({
+        const photoRef = await db.collection('photos').add({
             userId: APP_STATE.currentUser.uid,
             userName: APP_STATE.currentUser.displayName,
             userAvatar: APP_STATE.currentUser.avatar,
@@ -816,20 +816,13 @@ async function postPhoto() {
             image: APP_STATE.currentPhotoData,
             caption: elements.captionInput.value.trim(),
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-            createdAt: new Date().toISOString() // For sorting before server timestamp arrives
+            createdAt: new Date().toISOString()
         });
 
         // Add to selected album if user chose one
         const selectedAlbumId = document.getElementById('albumSelect').value;
         if (selectedAlbumId) {
-            const recentPhoto = await db.collection('photos')
-                .where('userId', '==', APP_STATE.currentUser.uid)
-                .orderBy('createdAt', 'desc')
-                .limit(1)
-                .get();
-            if (!recentPhoto.empty) {
-                await addPhotoToAlbum(recentPhoto.docs[0].id, selectedAlbumId);
-            }
+            await addPhotoToAlbum(photoRef.id, selectedAlbumId);
         }
 
         cancelPhoto();
