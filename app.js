@@ -30,8 +30,6 @@ const elements = {
     loginError: document.getElementById('loginError'),
     loginBtn: document.getElementById('loginBtn'),
     app: document.getElementById('app'),
-    displayAccountId: document.getElementById('displayAccountId'),
-    copyIdBtn: document.getElementById('copyIdBtn'),
     logoutBtn: document.getElementById('logoutBtn'),
     friendsBtn: document.getElementById('friendsBtn'),
     friendsModal: document.getElementById('friendsModal'),
@@ -138,10 +136,6 @@ function setupEventListeners() {
     elements.loginPassword.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') handleLogin();
     });
-
-    // Account ID copy
-    elements.copyIdBtn.addEventListener('click', copyAccountId);
-    elements.displayAccountId.addEventListener('click', copyAccountId);
 
     // Logout
     elements.logoutBtn.addEventListener('click', handleLogout);
