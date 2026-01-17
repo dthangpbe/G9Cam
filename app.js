@@ -816,7 +816,7 @@ async function initCamera() {
             <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; text-align: center;">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📷</div>
                 <p style="color: #b4b4c8;">Không thể truy cập camera</p>
-                <p style="color: #b4b4c8; font-size: 0.9rem; margin-top: 0.5rem;">Vui lòng cấp quyền camera hoặc sử dụng HTTPS/localhost</p>
+                <p style="color: #b4b4c8; font-size: 0.9rem; margin-top: 0.5rem;">Vui lòng cấp quyền camera</p>
             </div>
         `;
 

@@ -338,6 +338,12 @@ body {
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.app-title:hover {
+    transform: scale(1.05);
 }
 
 .header-actions {
