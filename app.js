@@ -2010,3 +2010,13 @@ async function loadAlbumsToSelect() {
         console.error('Error loading albums:', error);
     }
 }
+
+// Logo click to scroll to top
+document.addEventListener('DOMContentLoaded', () => {
+    const logo = document.querySelector('.app-title');
+    if (logo) {
+        logo.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+});
