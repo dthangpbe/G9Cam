@@ -2026,12 +2026,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (friendFilter) {
         friendFilter.addEventListener('change', handleFriendFilterChange);
 
-        // Auto-populate friend list after short delay
-        setTimeout(() => {
+        // Auto-populate with retry logic
+        let attempts = 0;
+        const maxAttempts = 10;
+        const tryPopulate = () => {
+            attempts++;
             if (APP_STATE.currentUser) {
+                console.log('✅ Auto-populating friend filter');
                 populateFriendFilter();
+            } else if (attempts < maxAttempts) {
+                const delay = attempts * 500; // 500ms, 1s, 1.5s, 2s...
+                setTimeout(tryPopulate, delay);
+            } else {
+                console.warn('⚠️ Could not auto-populate. Call populateFriendFilter() manually.');
             }
-        }, 1000);
+        };
+        setTimeout(tryPopulate, 1000);
     }
 });
 
