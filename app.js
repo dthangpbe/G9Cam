@@ -2073,7 +2073,7 @@ window.populateFriendFilter = async function () {
                 const friendUser = friendUserDoc.data();
                 const option = document.createElement('option');
                 option.value = friendId;
-                option.textContent = `${friendUser.username} (${friendUser.accountId})`;
+                option.textContent = friendUser.username;
                 friendFilter.appendChild(option);
             }
         }
