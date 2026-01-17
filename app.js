@@ -2055,7 +2055,7 @@ window.populateFriendFilter = async function () {
         // Add friend options
         for (const friendDoc of friendsSnapshot.docs) {
             const friendData = friendDoc.data();
-            const friendId = friendDoc.id;
+            const friendId = friendData.friendUid;
 
             // Get friend's user data
             const friendUserDoc = await db.collection('users').doc(friendId).get();
