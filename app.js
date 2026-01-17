@@ -739,8 +739,14 @@ async function initCamera() {
         elements.cameraPreview.srcObject = currentStream;
         APP_STATE.stream = currentStream;
 
-        // Flip camera preview horizontally for front camera (natural selfie view)
-        elements.cameraPreview.style.transform = 'scaleX(-1)';
+        // Check actual camera and mirror ONLY front camera
+        const track = currentStream.getVideoTracks()[0];
+        const settings = track.getSettings();
+        if (settings.facingMode === 'user') {
+            elements.cameraPreview.style.transform = 'scaleX(-1)';
+        } else {
+            elements.cameraPreview.style.transform = 'scaleX(1)';
+        }
     } catch (error) {
         console.error('Camera error:', error);
         elements.cameraPreview.style.display = 'none';
@@ -811,9 +817,15 @@ function capturePhoto() {
     canvas.width = width;
     canvas.height = height;
 
-    // Always flip canvas to un-mirror preview (both cameras mirrored)
-    ctx.translate(width, 0);
-    ctx.scale(-1, 1);
+    // Flip canvas ONLY for front camera (to un-mirror)
+    if (currentStream) {
+        const track = currentStream.getVideoTracks()[0];
+        const settings = track.getSettings();
+        if (settings.facingMode === 'user') {
+            ctx.translate(width, 0);
+            ctx.scale(-1, 1);
+        }
+    }
 
     ctx.drawImage(video, 0, 0, width, height);
 
