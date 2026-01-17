@@ -2047,7 +2047,6 @@ window.populateFriendFilter = async function () {
         const friendsSnapshot = await db.collection('users')
             .doc(APP_STATE.currentUser.uid)
             .collection('friends')
-            .where('status', '==', 'accepted')
             .get();
 
         // Clear existing options except "All Friends"
