@@ -1447,7 +1447,7 @@ async function postComment(photoId) {
                 userId: APP_STATE.currentUser.uid,
                 userName: APP_STATE.currentUser.displayName || APP_STATE.currentUser.username,
                 userAvatar: APP_STATE.currentUser.avatar,
-                userAvatarImage: APP_STATE.currentUser.avatarImage,
+                userAvatarImage: APP_STATE.currentUser.avatarImage || '',
                 comment: commentText,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
