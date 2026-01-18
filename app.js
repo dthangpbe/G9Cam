@@ -220,7 +220,8 @@ function setupEventListeners() {
     });
 
     // Notifications
-    elements.notificationsBtn.addEventListener('click', () => openModal(elements.notificationsModal));
+    // Notifications - now handled by hamburger menu
+    // elements.notificationsBtn.addEventListener('click', () => openModal(elements.notificationsModal));
     elements.closeNotificationsModal.addEventListener('click', () => closeModal(elements.notificationsModal));
     elements.notificationsModal.addEventListener('click', (e) => {
         if (e.target === elements.notificationsModal) closeModal(elements.notificationsModal);
