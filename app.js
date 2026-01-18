@@ -972,7 +972,7 @@ async function postPhoto() {
 }
 
 // ===== Photos Feed =====
-let previousPhotoSnapshot = null;
+let previousFriendPhotoIds = new Set();
 
 function setupPhotosListener() {
     // Simple approach: Listen to ALL photos and filter client-side
@@ -998,17 +998,29 @@ function setupPhotosListener() {
             return friendUids.includes(data.userId) || friendAccountIds.includes(data.accountId);
         });
 
-        // Check if this is a new photo from current user (for animation)
-        let shouldAnimate = false;
-        if (previousPhotoSnapshot) {
-            const newDocs = snapshot.docChanges().filter(change => change.type === 'added');
-            const userNewPhotos = newDocs.filter(change =>
-                change.doc.data().userId === APP_STATE.currentUser.uid
-            );
-            shouldAnimate = userNewPhotos.length > 0;
+        // Get IDs of current friend photos
+        const currentFriendPhotoIds = new Set(friendPhotos.map(doc => doc.id));
+
+        // Check if friend photos actually changed
+        const hasChanges = currentFriendPhotoIds.size !== previousFriendPhotoIds.size ||
+            [...currentFriendPhotoIds].some(id => !previousFriendPhotoIds.has(id));
+
+        // Only update if there are actual changes to friend photos
+        if (!hasChanges && previousFriendPhotoIds.size > 0) {
+            return; // No changes to friend photos, skip update
         }
 
-        previousPhotoSnapshot = snapshot;
+        // Check if new photo is from current user (for animation)
+        const newUserPhotos = [...currentFriendPhotoIds].filter(
+            id => !previousFriendPhotoIds.has(id)
+        ).filter(id => {
+            const doc = friendPhotos.find(d => d.id === id);
+            return doc && doc.data().userId === APP_STATE.currentUser.uid;
+        });
+
+        const shouldAnimate = newUserPhotos.length > 0;
+
+        previousFriendPhotoIds = currentFriendPhotoIds;
         renderFeed(friendPhotos, shouldAnimate);
     });
 
