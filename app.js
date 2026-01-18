@@ -1,3 +1,4 @@
+```javascript
 // ===== FIREBASE LOCKET APP - REAL-TIME VERSION =====
 // Uses Firebase Auth + Firestore for real online connections
 
@@ -8,7 +9,8 @@ const APP_STATE = {
     currentPhotoData: null,
     currentReactionPhotoId: null,
     stream: null,
-    selectedFriendFilter: 'all' // Filter feed by friend
+    selectedFriendFilter: 'all', // Filter feed by friend
+    viewMode: localStorage.getItem('viewMode') || 'list' // 'list' or 'grid'
 };
 
 // Camera state
@@ -95,7 +97,7 @@ const elements = {
 // ===== Unique ID Generation =====
 function generateAccountId(username) {
     const randomNum = Math.floor(10000 + Math.random() * 90000);
-    return `@${username.toLowerCase()}-${randomNum}`;
+    return `@${ username.toLowerCase() } -${ randomNum } `;
 }
 
 function getRandomAvatar() {
@@ -313,7 +315,7 @@ async function handleRegister() {
         }
 
         // Create Firebase Auth account
-        const email = `${accountId.replace('@', '')}@locket.app`;
+        const email = `${ accountId.replace('@', '') } @locket.app`;
         const userCredential = await auth.createUserWithEmailAndPassword(email, password);
         const user = userCredential.user;
 
@@ -334,7 +336,7 @@ async function handleRegister() {
 
     } catch (error) {
         console.error('Registration error:', error);
-        elements.regError.textContent = `Lỗi: ${error.message}`;
+        elements.regError.textContent = `Lỗi: ${ error.message } `;
     }
 }
 
@@ -359,7 +361,7 @@ async function handleLogin() {
 
         if (usernameOrId.startsWith('@')) {
             // Login with account ID
-            email = `${usernameOrId.replace('@', '')}@locket.app`;
+            email = `${ usernameOrId.replace('@', '') } @locket.app`;
         } else {
             // Login with username - need to find the email
             const userQuery = await db.collection('users')
@@ -383,7 +385,7 @@ async function handleLogin() {
         if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found') {
             elements.loginError.textContent = 'Tên người dùng hoặc mật khẩu không đúng!';
         } else {
-            elements.loginError.textContent = `Lỗi: ${error.message}`;
+            elements.loginError.textContent = `Lỗi: ${ error.message } `;
         }
     }
 }
@@ -461,12 +463,12 @@ function setupFriendsListener() {
 async function renderFriends(snapshot) {
     if (!snapshot || snapshot.empty) {
         elements.friendsList.innerHTML = `
-            <div class="empty-state">
+    < div class="empty-state" >
                 <div class="empty-state-icon">👥</div>
                 <p>Bạn chưa có bạn bè nào</p>
                 <p style="font-size: 0.9rem; margin-top: 0.5rem;">Tìm bạn bằng ID tài khoản!</p>
-            </div>
-        `;
+            </div >
+    `;
         return;
     }
 
@@ -495,11 +497,11 @@ async function renderFriends(snapshot) {
 
     elements.friendsList.innerHTML = updatedFriends.map(friend => {
         const avatarHTML = friend.avatarImage
-            ? `<img src="${friend.avatarImage}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+            ? `< img src = "${friend.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" > `
             : friend.avatar;
 
         return `
-            <div class="friend-item">
+    < div class="friend-item" >
                 <div class="friend-avatar" onclick="viewUserProfile('${friend.friendUid}')" style="cursor: pointer;">
                     ${avatarHTML}
                 </div>
@@ -508,8 +510,8 @@ async function renderFriends(snapshot) {
                     <p>${friend.accountId}</p>
                 </div>
                 <button class="friend-action remove" onclick="removeFriend('${friend.friendUid}')">Xóa</button>
-            </div>
-        `;
+            </div >
+    `;
     }).join('');
 }
 
@@ -540,10 +542,10 @@ async function handleFriendSearch() {
 
     if (!searchQuery.startsWith('@')) {
         elements.searchResults.innerHTML = `
-            <div class="search-no-results">
-                💡 Vui lòng nhập ID tài khoản (bắt đầu bằng @)
-            </div>
-        `;
+    < div class="search-no-results" >
+                💡 Vui lòng nhập ID tài khoản(bắt đầu bằng @)
+            </div >
+    `;
         return;
     }
 
@@ -555,10 +557,10 @@ async function handleFriendSearch() {
 
         if (userQuery.empty) {
             elements.searchResults.innerHTML = `
-                <div class="search-no-results">
-                    ❌ Không tìm thấy tài khoản với ID: ${searchQuery}
-                </div>
-            `;
+    < div class="search-no-results" >
+                    ❌ Không tìm thấy tài khoản với ID: ${ searchQuery }
+                </div >
+    `;
             return;
         }
 
@@ -567,10 +569,10 @@ async function handleFriendSearch() {
 
         if (userUid === APP_STATE.currentUser.uid) {
             elements.searchResults.innerHTML = `
-                <div class="search-no-results">
-                    ℹ️ Đây là tài khoản của bạn
-                </div>
-            `;
+    < div class="search-no-results" >
+        ℹ️ Đây là tài khoản của bạn
+                </div >
+    `;
             return;
         }
 
@@ -580,42 +582,42 @@ async function handleFriendSearch() {
 
         if (friendDoc.exists) {
             const avatarHTML = userData.avatarImage
-                ? `<img src="${userData.avatarImage}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+                ? `< img src = "${userData.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" > `
                 : userData.avatar;
 
             elements.searchResults.innerHTML = `
-                <div class="search-result-item">
+    < div class="search-result-item" >
                     <div class="friend-avatar">${avatarHTML}</div>
                     <div class="friend-info">
                         <h4>${userData.displayName}</h4>
                         <p>${userData.accountId}</p>
                     </div>
                     <button class="friend-action" disabled style="opacity: 0.5;">Đã kết bạn</button>
-                </div>
-            `;
+                </div >
+    `;
         } else {
             const avatarHTML = userData.avatarImage
-                ? `<img src="${userData.avatarImage}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+                ? `< img src = "${userData.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" > `
                 : userData.avatar;
 
             elements.searchResults.innerHTML = `
-                <div class="search-result-item">
+    < div class="search-result-item" >
                     <div class="friend-avatar">${avatarHTML}</div>
                     <div class="friend-info">
                         <h4>${userData.displayName}</h4>
                         <p>${userData.accountId}</p>
                     </div>
                     <button class="friend-action" onclick="addFriendByUid('${userUid}', '${userData.accountId}', '${userData.displayName}', '${userData.avatar}')">Thêm bạn</button>
-                </div>
-            `;
+                </div >
+    `;
         }
     } catch (error) {
         console.error('Friend search error:', error);
         elements.searchResults.innerHTML = `
-            <div class="search-no-results">
-                ❌ Lỗi tìm kiếm: ${error.message}
-            </div>
-        `;
+    < div class="search-no-results" >
+                ❌ Lỗi tìm kiếm: ${ error.message }
+            </div >
+    `;
     }
 }
 
@@ -634,10 +636,10 @@ async function addFriendByUid(friendUid, accountId, displayName, avatar) {
 
         elements.friendSearchInput.value = '';
         elements.searchResults.innerHTML = `
-            <div class="search-no-results" style="color: #43e97b;">
-                ✅ Đã gửi lời mời kết bạn tới ${displayName}!
-            </div>
-        `;
+    < div class="search-no-results" style = "color: #43e97b;" >
+                ✅ Đã gửi lời mời kết bạn tới ${ displayName } !
+            </div >
+    `;
 
         setTimeout(() => {
             elements.searchResults.innerHTML = '';
@@ -714,19 +716,19 @@ function renderSuggestedFriends() {
     requestsRef.where('status', '==', 'pending').onSnapshot((snapshot) => {
         if (snapshot.empty) {
             elements.suggestedList.innerHTML = `
-                <div class="empty-state">
+    < div class="empty-state" >
                     <div class="empty-state-icon">📬</div>
                     <p>Không có lời mời kết bạn</p>
                     <p style="font-size: 0.9rem; margin-top: 0.5rem;">Tìm kiếm bạn bè bằng ID để gửi lời mời!</p>
-                </div>
-            `;
+                </div >
+    `;
             return;
         }
 
         const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         elements.suggestedList.innerHTML = requests.map(request => `
-            <div class="friend-item">
+    < div class="friend-item" >
                 <div class="friend-avatar">${request.fromAvatar}</div>
                 <div class="friend-info">
                     <h4>${request.fromDisplayName}</h4>
@@ -736,8 +738,8 @@ function renderSuggestedFriends() {
                     <button class="friend-action" onclick="acceptFriendRequest('${request.fromUid}', '${request.fromAccountId}', '${request.fromDisplayName}', '${request.fromAvatar}')" style="background: #43e97b;">Chấp nhận</button>
                     <button class="friend-action remove" onclick="rejectFriendRequest('${request.fromUid}')">Từ chối</button>
                 </div>
-            </div>
-        `).join('');
+            </div >
+    `).join('');
     });
 }
 
@@ -831,12 +833,12 @@ async function initCamera() {
         console.error('Camera error:', error);
         elements.cameraPreview.style.display = 'none';
         elements.cameraPreview.parentElement.innerHTML = `
-            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; text-align: center;">
+    < div style = "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; text-align: center;" >
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📷</div>
                 <p style="color: #b4b4c8;">Không thể truy cập camera</p>
                 <p style="color: #b4b4c8; font-size: 0.9rem; margin-top: 0.5rem;">Vui lòng cấp quyền camera</p>
-            </div>
-        `;
+            </div >
+    `;
 
         if (error?.name === 'NotAllowedError') {
             showCameraMessage('Bạn đã từ chối quyền camera. Hãy cấp quyền để sử dụng.', 'error');
@@ -875,7 +877,7 @@ async function flipCamera() {
         if (usedFallback) {
             const wantText = currentFacingMode === 'environment' ? 'camera sau' : 'camera trước';
             showCameraMessage(
-                `Không thể ép ${wantText} (exact). Đã chuyển sang chế độ dự phòng (ideal) — có thể máy đã chọn camera khác.`,
+                `Không thể ép ${ wantText } (exact).Đã chuyển sang chế độ dự phòng(ideal) — có thể máy đã chọn camera khác.`,
                 'info'
             );
         }
@@ -1039,12 +1041,12 @@ function setupPhotosListener() {
 async function renderFeed(photoDocs, shouldAnimate = false) {
     if (!photoDocs || photoDocs.length === 0) {
         elements.photoFeed.innerHTML = `
-            <div class="empty-state">
+    < div class="empty-state" >
                 <div class="empty-state-icon">📸</div>
                 <p>Chưa có ảnh nào</p>
                 <p style="font-size: 0.9rem; margin-top: 0.5rem;">Chụp ảnh đầu tiên của bạn hoặc thêm bạn bè!</p>
-            </div>
-        `;
+            </div >
+    `;
         return;
     }
 
@@ -1082,11 +1084,11 @@ async function renderFeed(photoDocs, shouldAnimate = false) {
 
         // Render avatar (image or emoji)
         const avatarHTML = userAvatarImage
-            ? `<img src="${userAvatarImage}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
-            : `<span>${userAvatar}</span>`;
+            ? `< img src = "${userAvatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" > `
+            : `< span > ${ userAvatar }</span > `;
 
         return `
-            <div class="photo-card" data-user-id="${photo.userId}">
+    < div class="photo-card" data - user - id="${photo.userId}" >
                 <div class="photo-card-header">
                     <div class="user-avatar" onclick="viewUserProfile('${photo.userId}')" style="cursor: pointer;">
                         ${avatarHTML}
@@ -1119,8 +1121,8 @@ async function renderFeed(photoDocs, shouldAnimate = false) {
                         <div id="commentCount-${photo.id}" class="comment-count"></div>
                     </div>
                 </div>
-            </div>
-        `;
+            </div >
+    `;
     }).join('');
 
     photos.forEach(photo => {
@@ -1141,9 +1143,9 @@ function formatTimestamp(timestamp) {
     const days = Math.floor(diff / 86400000);
 
     if (minutes < 1) return 'Vừa xong';
-    if (minutes < 60) return `${minutes} phút trước`;
-    if (hours < 24) return `${hours} giờ trước`;
-    if (days < 7) return `${days} ngày trước`;
+    if (minutes < 60) return `${ minutes } phút trước`;
+    if (hours < 24) return `${ hours } giờ trước`;
+    if (days < 7) return `${ days } ngày trước`;
 
     return date.toLocaleDateString('vi-VN');
 }
@@ -1165,15 +1167,17 @@ function setupReactionsListener(photoId) {
             reactions[data.emoji].push(data.userName);
         });
 
-        const container = document.getElementById(`reactionsContainer-${photoId}`);
+        const container = document.getElementById(`reactionsContainer - ${ photoId } `);
         if (container) {
             container.innerHTML = `
-                <div class="reactions-display">
-                    ${Object.entries(reactions).map(([emoji, users]) =>
+    < div class="reactions-display" >
+        ${
+            Object.entries(reactions).map(([emoji, users]) =>
                 `<div class="reaction-item">${emoji} ${users.length}</div>`
-            ).join('')}
-                </div>
-            `;
+            ).join('')
+}
+                </div >
+    `;
         }
     });
 }
@@ -1420,7 +1424,7 @@ function removeAvatar() {
 
 function updateBioCharCount() {
     const length = elements.editBio.value.length;
-    elements.bioCharCount.textContent = `${length}/150`;
+    elements.bioCharCount.textContent = `${ length }/150`;
 }
 
 async function saveProfile() {
@@ -2235,3 +2239,45 @@ function updateMenuBadges() {
 
 // Update badges periodically
 setInterval(updateMenuBadges, 1000);
+// ===== View Toggle Between Grid and List =====
+function toggleView() {
+    const photoFeed = document.getElementById('photoFeed');
+    const gridIcon = document.querySelector('.grid-icon');
+    const listIcon = document.querySelector('.list-icon');
+
+    if (APP_STATE.viewMode === 'list') {
+        // Switch to grid view
+        APP_STATE.viewMode = 'grid';
+        photoFeed.classList.add('grid-view');
+        gridIcon.style.display = 'none';
+        listIcon.style.display = 'inline';
+    } else {
+        // Switch to list view
+        APP_STATE.viewMode = 'list';
+        photoFeed.classList.remove('grid-view');
+        gridIcon.style.display = 'inline';
+        listIcon.style.display = 'none';
+    }
+
+    // Save preference
+    localStorage.setItem('viewMode', APP_STATE.viewMode);
+}
+
+// Initialize view mode on page load
+function initViewMode() {
+    const photoFeed = document.getElementById('photoFeed');
+    const gridIcon = document.querySelector('.grid-icon');
+    const listIcon = document.querySelector('.list-icon');
+
+    if (APP_STATE.viewMode === 'grid') {
+        photoFeed.classList.add('grid-view');
+        if (gridIcon) gridIcon.style.display = 'none';
+        if (listIcon) listIcon.style.display = 'inline';
+    }
+}
+
+// Add event listener for toggle button
+document.getElementById('viewToggle')?.addEventListener('click', toggleView);
+
+// Initialize view mode after DOM loads
+setTimeout(initViewMode, 500);
