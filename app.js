@@ -31,8 +31,8 @@ const elements = {
     loginError: document.getElementById('loginError'),
     loginBtn: document.getElementById('loginBtn'),
     app: document.getElementById('app'),
-    logoutBtn: document.getElementById('logoutBtn'),
-    friendsBtn: document.getElementById('friendsBtn'),
+    // logoutBtn: removed (now in hamburger menu)
+    // friendsBtn: removed (now in hamburger menu)
     friendsModal: document.getElementById('friendsModal'),
     closeFriendsModal: document.getElementById('closeFriendsModal'),
     friendSearchInput: document.getElementById('friendSearchInput'),
@@ -77,7 +77,7 @@ const elements = {
     cancelEditBtn: document.getElementById('cancelEditBtn'),
     saveProfileBtn: document.getElementById('saveProfileBtn'),
     // Notification elements
-    notificationsBtn: document.getElementById('notificationsBtn'),
+    // notificationsBtn: removed (now in hamburger menu)
     notifBadge: document.getElementById('notifBadge'),
     notificationsModal: document.getElementById('notificationsModal'),
     closeNotificationsModal: document.getElementById('closeNotificationsModal'),
@@ -86,7 +86,7 @@ const elements = {
     headerAvatar: document.getElementById('headerAvatar'),
     // Camera and theme controls
     flipCameraBtn: document.getElementById('flipCameraBtn'),
-    themeToggle: document.getElementById('themeToggle'),
+    // themeToggle: removed (now in hamburger menu)
     albumsModal: document.getElementById('albumsModal'),
     createAlbumModal: document.getElementById('createAlbumModal'),
     albumDetailModal: document.getElementById('albumDetailModal')
@@ -141,11 +141,11 @@ function setupEventListeners() {
         if (e.key === 'Enter') handleLogin();
     });
 
-    // Logout
-    elements.logoutBtn.addEventListener('click', handleLogout);
+    // Logout - now handled by hamburger menu
+    // elements.logoutBtn.addEventListener('click', handleLogout);
 
-    // Friends
-    elements.friendsBtn.addEventListener('click', () => openModal(elements.friendsModal));
+    // Friends - now handled by hamburger menu
+    // elements.friendsBtn.addEventListener('click', () => openModal(elements.friendsModal));
     elements.closeFriendsModal.addEventListener('click', () => closeModal(elements.friendsModal));
 
     // Friend search
@@ -154,7 +154,7 @@ function setupEventListeners() {
     // Camera
     elements.captureBtn.addEventListener('click', capturePhoto);
     elements.flipCameraBtn.addEventListener('click', flipCamera);
-    elements.themeToggle.addEventListener('click', toggleTheme);
+    // elements.themeToggle.addEventListener('click', toggleTheme); // Now in hamburger menu
     elements.cancelBtn.addEventListener('click', cancelPhoto);
     elements.postBtn.addEventListener('click', postPhoto);
 
