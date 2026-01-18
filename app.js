@@ -462,12 +462,11 @@ function setupFriendsListener() {
 async function renderFriends(snapshot) {
     if (!snapshot || snapshot.empty) {
         elements.friendsList.innerHTML = `
-    < div class="empty-state" >
+    <div class="empty-state" >
                 <div class="empty-state-icon">👥</div>
                 <p>Bạn chưa có bạn bè nào</p>
                 <p style="font-size: 0.9rem; margin-top: 0.5rem;">Tìm bạn bằng ID tài khoản!</p>
-            </div >
-    `;
+            </div>`;
         return;
     }
 
@@ -496,11 +495,11 @@ async function renderFriends(snapshot) {
 
     elements.friendsList.innerHTML = updatedFriends.map(friend => {
         const avatarHTML = friend.avatarImage
-            ? `< img src = "${friend.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" > `
+            ? `<img src = "${friend.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
             : friend.avatar;
 
         return `
-    < div class="friend-item" >
+    <div class="friend-item" >
                 <div class="friend-avatar" onclick="viewUserProfile('${friend.friendUid}')" style="cursor: pointer;">
                     ${avatarHTML}
                 </div>
@@ -509,8 +508,7 @@ async function renderFriends(snapshot) {
                     <p>${friend.accountId}</p>
                 </div>
                 <button class="friend-action remove" onclick="removeFriend('${friend.friendUid}')">Xóa</button>
-            </div >
-    `;
+            </div>`;
     }).join('');
 }
 
@@ -541,10 +539,9 @@ async function handleFriendSearch() {
 
     if (!searchQuery.startsWith('@')) {
         elements.searchResults.innerHTML = `
-    < div class="search-no-results" >
+    <div class="search-no-results" >
                 💡 Vui lòng nhập ID tài khoản(bắt đầu bằng @)
-            </div >
-    `;
+            </div>`;
         return;
     }
 
@@ -556,10 +553,9 @@ async function handleFriendSearch() {
 
         if (userQuery.empty) {
             elements.searchResults.innerHTML = `
-    < div class="search-no-results" >
+    <div class="search-no-results" >
                     ❌ Không tìm thấy tài khoản với ID: ${searchQuery}
-                </div >
-    `;
+                </div>`;
             return;
         }
 
@@ -568,10 +564,9 @@ async function handleFriendSearch() {
 
         if (userUid === APP_STATE.currentUser.uid) {
             elements.searchResults.innerHTML = `
-    < div class="search-no-results" >
+    <div class="search-no-results" >
         ℹ️ Đây là tài khoản của bạn
-                </div >
-    `;
+                </div>`;
             return;
         }
 
@@ -581,42 +576,39 @@ async function handleFriendSearch() {
 
         if (friendDoc.exists) {
             const avatarHTML = userData.avatarImage
-                ? `< img src = "${userData.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" > `
+                ? `<img src = "${userData.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
                 : userData.avatar;
 
             elements.searchResults.innerHTML = `
-    < div class="search-result-item" >
+    <div class="search-result-item" >
                     <div class="friend-avatar">${avatarHTML}</div>
                     <div class="friend-info">
                         <h4>${userData.displayName}</h4>
                         <p>${userData.accountId}</p>
                     </div>
                     <button class="friend-action" disabled style="opacity: 0.5;">Đã kết bạn</button>
-                </div >
-    `;
+                </div>`;
         } else {
             const avatarHTML = userData.avatarImage
-                ? `< img src = "${userData.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;" > `
+                ? `<img src = "${userData.avatarImage}" alt = "Avatar" style = "width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
                 : userData.avatar;
 
             elements.searchResults.innerHTML = `
-    < div class="search-result-item" >
+    <div class="search-result-item" >
                     <div class="friend-avatar">${avatarHTML}</div>
                     <div class="friend-info">
                         <h4>${userData.displayName}</h4>
                         <p>${userData.accountId}</p>
                     </div>
                     <button class="friend-action" onclick="addFriendByUid('${userUid}', '${userData.accountId}', '${userData.displayName}', '${userData.avatar}')">Thêm bạn</button>
-                </div >
-    `;
+                </div>`;
         }
     } catch (error) {
         console.error('Friend search error:', error);
         elements.searchResults.innerHTML = `
-    < div class="search-no-results" >
+    <div class="search-no-results" >
                 ❌ Lỗi tìm kiếm: ${error.message}
-            </div >
-    `;
+            </div>`;
     }
 }
 
@@ -635,10 +627,9 @@ async function addFriendByUid(friendUid, accountId, displayName, avatar) {
 
         elements.friendSearchInput.value = '';
         elements.searchResults.innerHTML = `
-    < div class="search-no-results" style = "color: #43e97b;" >
+    <div class="search-no-results" style = "color: #43e97b;" >
                 ✅ Đã gửi lời mời kết bạn tới ${displayName} !
-            </div >
-    `;
+            </div>`;
 
         setTimeout(() => {
             elements.searchResults.innerHTML = '';
@@ -715,19 +706,18 @@ function renderSuggestedFriends() {
     requestsRef.where('status', '==', 'pending').onSnapshot((snapshot) => {
         if (snapshot.empty) {
             elements.suggestedList.innerHTML = `
-    < div class="empty-state" >
+    <div class="empty-state" >
                     <div class="empty-state-icon">📬</div>
                     <p>Không có lời mời kết bạn</p>
                     <p style="font-size: 0.9rem; margin-top: 0.5rem;">Tìm kiếm bạn bè bằng ID để gửi lời mời!</p>
-                </div >
-    `;
+                </div>`;
             return;
         }
 
         const requests = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
         elements.suggestedList.innerHTML = requests.map(request => `
-    < div class="friend-item" >
+    <div class="friend-item" >
                 <div class="friend-avatar">${request.fromAvatar}</div>
                 <div class="friend-info">
                     <h4>${request.fromDisplayName}</h4>
@@ -737,8 +727,7 @@ function renderSuggestedFriends() {
                     <button class="friend-action" onclick="acceptFriendRequest('${request.fromUid}', '${request.fromAccountId}', '${request.fromDisplayName}', '${request.fromAvatar}')" style="background: #43e97b;">Chấp nhận</button>
                     <button class="friend-action remove" onclick="rejectFriendRequest('${request.fromUid}')">Từ chối</button>
                 </div>
-            </div >
-    `).join('');
+            </div>`).join('');
     });
 }
 
@@ -832,12 +821,11 @@ async function initCamera() {
         console.error('Camera error:', error);
         elements.cameraPreview.style.display = 'none';
         elements.cameraPreview.parentElement.innerHTML = `
-    < div style = "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; text-align: center;" >
+    <div style = "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; text-align: center;" >
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📷</div>
                 <p style="color: #b4b4c8;">Không thể truy cập camera</p>
                 <p style="color: #b4b4c8; font-size: 0.9rem; margin-top: 0.5rem;">Vui lòng cấp quyền camera</p>
-            </div >
-    `;
+            </div>`;
 
         if (error?.name === 'NotAllowedError') {
             showCameraMessage('Bạn đã từ chối quyền camera. Hãy cấp quyền để sử dụng.', 'error');
@@ -1040,12 +1028,11 @@ function setupPhotosListener() {
 async function renderFeed(photoDocs, shouldAnimate = false) {
     if (!photoDocs || photoDocs.length === 0) {
         elements.photoFeed.innerHTML = `
-    < div class="empty-state" >
+    <div class="empty-state" >
                 <div class="empty-state-icon">📸</div>
                 <p>Chưa có ảnh nào</p>
                 <p style="font-size: 0.9rem; margin-top: 0.5rem;">Chụp ảnh đầu tiên của bạn hoặc thêm bạn bè!</p>
-            </div >
-    `;
+            </div>`;
         return;
     }
 
@@ -1169,13 +1156,12 @@ function setupReactionsListener(photoId) {
         const container = document.getElementById(`reactionsContainer - ${photoId} `);
         if (container) {
             container.innerHTML = `
-    < div class="reactions-display" >
+    <div class="reactions-display" >
         ${Object.entries(reactions).map(([emoji, users]) =>
                 `<div class="reaction-item">${emoji} ${users.length}</div>`
             ).join('')
                 }
-                </div >
-    `;
+                </div>`;
         }
     });
 }
