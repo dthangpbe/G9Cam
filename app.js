@@ -1153,7 +1153,7 @@ function setupReactionsListener(photoId) {
             reactions[data.emoji].push(data.userName);
         });
 
-        const container = document.getElementById(`reactionsContainer - ${photoId} `);
+        const container = document.getElementById(`reactionsContainer-${photoId}`);
         if (container) {
             container.innerHTML = `
     <div class="reactions-display" >
