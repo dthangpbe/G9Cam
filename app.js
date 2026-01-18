@@ -570,9 +570,13 @@ async function handleFriendSearch() {
             .collection('friends').doc(userUid).get();
 
         if (friendDoc.exists) {
+            const avatarHTML = userData.avatarImage
+                ? `<img src="${userData.avatarImage}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+                : userData.avatar;
+
             elements.searchResults.innerHTML = `
                 <div class="search-result-item">
-                    <div class="friend-avatar">${userData.avatar}</div>
+                    <div class="friend-avatar">${avatarHTML}</div>
                     <div class="friend-info">
                         <h4>${userData.displayName}</h4>
                         <p>${userData.accountId}</p>
@@ -581,9 +585,13 @@ async function handleFriendSearch() {
                 </div>
             `;
         } else {
+            const avatarHTML = userData.avatarImage
+                ? `<img src="${userData.avatarImage}" alt="Avatar" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`
+                : userData.avatar;
+
             elements.searchResults.innerHTML = `
                 <div class="search-result-item">
-                    <div class="friend-avatar">${userData.avatar}</div>
+                    <div class="friend-avatar">${avatarHTML}</div>
                     <div class="friend-info">
                         <h4>${userData.displayName}</h4>
                         <p>${userData.accountId}</p>
