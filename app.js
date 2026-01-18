@@ -821,11 +821,12 @@ async function initCamera() {
         console.error('Camera error:', error);
         elements.cameraPreview.style.display = 'none';
         elements.cameraPreview.parentElement.innerHTML = `
-    <div style = "display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; text-align: center;" >
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 2rem; text-align: center;">
                 <div style="font-size: 3rem; margin-bottom: 1rem;">📷</div>
                 <p style="color: #b4b4c8;">Không thể truy cập camera</p>
-                <p style="color: #b4b4c8; font-size: 0.9rem; margin-top: 0.5rem;">Vui lòng cấp quyền camera</p>
-            </div>`;
+                <p style="color: #b4b4c8; font-size: 0.9rem; margin-top: 0.5rem;">Vui lòng cấp quyền camera hoặc sử dụng HTTPS/localhost</p>
+            </div>
+        `;
 
         if (error?.name === 'NotAllowedError') {
             showCameraMessage('Bạn đã từ chối quyền camera. Hãy cấp quyền để sử dụng.', 'error');
@@ -864,7 +865,7 @@ async function flipCamera() {
         if (usedFallback) {
             const wantText = currentFacingMode === 'environment' ? 'camera sau' : 'camera trước';
             showCameraMessage(
-                `Không thể ép ${wantText} (exact).Đã chuyển sang chế độ dự phòng(ideal) — có thể máy đã chọn camera khác.`,
+                `Không thể ép ${wantText} (exact). Đã chuyển sang chế độ dự phòng (ideal) — có thể máy đã chọn camera khác.`,
                 'info'
             );
         }
