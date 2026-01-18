@@ -2989,4 +2989,42 @@ input::placeholder {
         top: 1rem;
         right: 1rem;
     }
+}/* Reactions Modal */
+.reaction-emojis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin: 1.5rem 0;
+}
+
+.emoji-btn {
+    background: var(--glass-bg);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 1rem;
+    font-size: 2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.emoji-btn:hover {
+    transform: scale(1.1);
+    border-color: var(--primary-color);
+    background: var(--card-bg);
+}
+
+.emoji-btn:active {
+    transform: scale(0.95);
+}
+
+[data-theme="light"] .emoji-btn {
+    background: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="light"] .emoji-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
 }
