@@ -518,7 +518,15 @@ function updateFriendCount() {
         .collection('friends')
         .get()
         .then(snapshot => {
-            elements.friendCount.textContent = snapshot.size;
+            const count = snapshot.size;
+            // Update both badges
+            if (elements.friendCount) {
+                elements.friendCount.textContent = count;
+            }
+            const menuFriendCount = document.getElementById('menuFriendCount');
+            if (menuFriendCount) {
+                menuFriendCount.textContent = count;
+            }
         });
 }
 
