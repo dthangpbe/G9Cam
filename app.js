@@ -2265,3 +2265,25 @@ document.getElementById('viewToggle')?.addEventListener('click', toggleView);
 
 // Initialize view mode after DOM loads
 setTimeout(initViewMode, 500);
+// ===== Image Zoom Functions =====
+function openImageZoom(imageUrl) {
+    const modal = document.getElementById('imageZoomModal');
+    const zoomedImage = document.getElementById('zoomedImage');
+
+    zoomedImage.src = imageUrl;
+    modal.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+
+function closeImageZoom() {
+    const modal = document.getElementById('imageZoomModal');
+    modal.style.display = 'none';
+    document.body.style.overflow = '';
+}
+
+// Close zoom on ESC key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeImageZoom();
+    }
+});

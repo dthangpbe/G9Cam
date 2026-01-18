@@ -357,6 +357,15 @@
         </div>
     </div>
 
+    <!-- Image Zoom Modal -->
+    <div id="imageZoomModal" class="modal">
+        <div class="modal-overlay" onclick="closeImageZoom()"></div>
+        <div class="image-zoom-container">
+            <button class="image-zoom-close" onclick="closeImageZoom()">✕</button>
+            <img id="zoomedImage" src="" alt="Zoomed image">
+        </div>
+    </div>
+
     <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
