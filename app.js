@@ -2152,3 +2152,70 @@ function filterPhotoFeed() {
         }
     });
 }
+// ===== Hamburger Menu Toggle =====
+const hamburgerBtn = document.getElementById('hamburgerBtn');
+const dropdownMenu = document.getElementById('dropdownMenu');
+
+// Toggle menu
+hamburgerBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    hamburgerBtn.classList.toggle('active');
+    dropdownMenu.classList.toggle('active');
+});
+
+// Close dropdown when clicking outside
+document.addEventListener('click', (e) => {
+    if (dropdownMenu && !dropdownMenu.contains(e.target) && !hamburgerBtn.contains(e.target)) {
+        dropdownMenu.classList.remove('active');
+        hamburgerBtn.classList.remove('active');
+    }
+});
+
+// Menu item actions
+document.getElementById('menuAlbumsBtn')?.addEventListener('click', () => {
+    renderAlbums();
+    openModal(elements.albumsModal);
+    dropdownMenu.classList.remove('active');
+    hamburgerBtn.classList.remove('active');
+});
+
+document.getElementById('menuFriendsBtn')?.addEventListener('click', () => {
+    openModal(elements.friendsModal);
+    dropdownMenu.classList.remove('active');
+    hamburgerBtn.classList.remove('active');
+});
+
+document.getElementById('menuNotificationsBtn')?.addEventListener('click', () => {
+    openModal(elements.notificationsModal);
+    dropdownMenu.classList.remove('active');
+    hamburgerBtn.classList.remove('active');
+});
+
+document.getElementById('menuThemeBtn')?.addEventListener('click', () => {
+    toggleTheme();
+    dropdownMenu.classList.remove('active');
+    hamburgerBtn.classList.remove('active');
+});
+
+document.getElementById('menuLogoutBtn')?.addEventListener('click', () => {
+    handleLogout();
+});
+
+// Update badge counts in menu
+function updateMenuBadges() {
+    const friendCount = document.querySelector('.friend-count')?.textContent || '0';
+    const menuFriendCount = document.getElementById('menuFriendCount');
+    if (menuFriendCount) {
+        menuFriendCount.textContent = friendCount;
+    }
+
+    const notifBadge = document.getElementById('notifBadge');
+    const menuNotifBadge = document.getElementById('menuNotifBadge');
+    if (notifBadge && menuNotifBadge) {
+        menuNotifBadge.textContent = notifBadge.textContent;
+        menuNotifBadge.style.display = notifBadge.style.display;
+    }
+}
+
+// Update badges periodically
+setInterval(updateMenuBadges, 1000);
