@@ -1935,8 +1935,9 @@ async function openAlbum(albumId, albumName, photoCount) {
                 return db.collection('photos').doc(photoId).get();
             });
 
-
+            console.log('Album photos snapshot:', albumPhotosSnapshot.docs.length, 'photos');
             const photosDocs = await Promise.all(photoPromises);
+            console.log('Fetched photo docs:', photosDocs.filter(d => d && d.exists).length);
 
             const photosHTML = photosDocs
                 .filter(doc => doc && doc.exists)
