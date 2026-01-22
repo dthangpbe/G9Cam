@@ -3099,3 +3099,28 @@ input::placeholder {
         font-size: 0.9rem;
     }
 }
+/* Delete Album Button */
+.delete-album-btn {
+    background: rgba(255, 59, 48, 0.1);
+    color: #ff3b30;
+    border: 1px solid rgba(255, 59, 48, 0.3);
+    border-radius: var(--radius-sm);
+    padding: 0.5rem 1rem;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.delete-album-btn:hover {
+    background: rgba(255, 59, 48, 0.2);
+    border-color: #ff3b30;
+    transform: scale(1.05);
+}
+
+[data-theme="light"] .delete-album-btn {
+    background: rgba(255, 59, 48, 0.08);
+}
+
+[data-theme="light"] .delete-album-btn:hover {
+    background: rgba(255, 59, 48, 0.15);
+}

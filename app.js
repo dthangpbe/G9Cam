@@ -1902,6 +1902,10 @@ async function openAlbum(albumId, albumName, photoCount) {
         // Set album info
         document.getElementById('albumDetailTitle').textContent = albumName;
 
+        // Setup delete button
+        const deleteBtn = document.getElementById('deleteAlbumBtn');
+        deleteBtn.onclick = () => deleteAlbum(albumId, albumName);
+
         // Get album details for description
         const albumDoc = await db.collection('users')
             .doc(APP_STATE.currentUser.uid)
@@ -2306,3 +2310,41 @@ document.addEventListener('keydown', (e) => {
         closeImageZoom();
     }
 });
+// Delete album function
+async function deleteAlbum(albumId, albumName) {
+    if (!confirm(`Xóa album "${albumName}"? Tất cả ảnh trong album sẽ bị xóa khỏi album (không xóa ảnh gốc).`)) {
+        return;
+    }
+
+    try {
+        // Delete all photos in album subcollection
+        const photosSnapshot = await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .doc(albumId)
+            .collection('photos')
+            .get();
+
+        const deletePromises = photosSnapshot.docs.map(doc => doc.ref.delete());
+        await Promise.all(deletePromises);
+
+        // Delete album document
+        await db.collection('users')
+            .doc(APP_STATE.currentUser.uid)
+            .collection('albums')
+            .doc(albumId)
+            .delete();
+
+        // Close modal and refresh list
+        closeModal(elements.albumDetailModal);
+        renderAlbums();
+
+        alert('Đã xóa album thành công!');
+    } catch (error) {
+        console.error('Error deleting album:', error);
+        alert('Không thể xóa album. Vui lòng thử lại!');
+    }
+}
+
+// Make globally accessible
+window.deleteAlbum = deleteAlbum;

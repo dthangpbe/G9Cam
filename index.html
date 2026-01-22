@@ -350,8 +350,11 @@
                     <h2 id="albumDetailTitle">Album</h2>
                     <p id="albumDetailDesc" style="color: var(--text-secondary); margin: 0.5rem 0 0 0;"></p>
                 </div>
-                <button class="close-modal"
-                    onclick="closeModal(document.getElementById('albumDetailModal'))">&times;</button>
+                <div style="display: flex; gap: 0.5rem; align-items: center;">
+                    <button id="deleteAlbumBtn" class="delete-album-btn" title="Xóa album">🗑️</button>
+                    <button class="close-modal"
+                        onclick="closeModal(document.getElementById('albumDetailModal'))">&times;</button>
+                </div>
             </div>
             <div id="albumPhotosGrid" class="albums-photos-grid"></div>
         </div>
