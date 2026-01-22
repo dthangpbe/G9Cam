@@ -1999,6 +1999,8 @@ async function removePhotoFromAlbum(albumId, photoId, event) {
         alert('Không thể xóa ảnh. Vui lòng thử lại!');
     }
 }
+// Make removePhotoFromAlbum globally accessible
+window.removePhotoFromAlbum = removePhotoFromAlbum;
 
 // Add photo to album (called during photo upload)
 async function addPhotoToAlbum(photoId, albumId) {
